@@ -2,8 +2,18 @@ spring:
   application:
     name: backend
 
+  ai:
+    google:
+      gemini:
+        api-key: ${SPRING_AI_GOOGLE_AI_GEMINI_API_KEY}
+    vectorstore:
+      pgvector:
+        index-type: HNSW
+        distance-type: COSINE
+        dimensions: 768
+
   datasource:
-    url: jdbc:postgresql://localhost:5432/workdone
+    url: jdbc:postgresql://postgres-workdone:5432/workdone
     username:
     password:
     driver-class-name: org.postgresql.Driver
@@ -12,9 +22,74 @@ spring:
     hibernate:
       ddl-auto: validate
     show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
 
   kafka:
-    bootstrap-servers: localhost:9094
+    bootstrap-servers: kafka-workdone:9092
     consumer:
       group-id: workdone-analyzer-group
       auto-offset-reset: earliest
+
+workdone:
+  profile:
+    input-directory: /data/workdone/profile-input
+
+  matching:
+    instant-threshold: 90.0
+    digest-threshold: 60.0
+    archive-threshold: 40.0
+    must-have-keywords:
+      - java
+      - spring boot
+      - sql
+
+  scheduling:
+    ingestion-cron: "0 0 */2 * * *"
+    digest-cron: "0 0 18 * * *"
+    zone-id: Europe/Warsaw
+
+  discord:
+    instant:
+      enabled: false
+      url:
+    digest:
+      enabled: false
+      url:
+
+  providers:
+    justjoinit:
+      enabled: true
+      base-url: https://api.justjoin.it
+      offers-path: /v2/user-panel/offers
+      priority: HIGH
+      filters:
+        keywords: [ java, spring ]
+        allowed-cities: [ lodz ]
+        allow-remote: true
+        allow-hybrid: true
+
+    nofluffjobs:
+      enabled: true
+      priority: HIGH
+      filters:
+        keywords: [ java, spring-boot ]
+        experience-levels: [ junior, mid ]
+        allow-remote: true
+        allow-hybrid: true
+
+    theprotocol:
+      enabled: true
+      priority: MEDIUM
+      filters:
+        allowed-cities: [ lodz ]
+        work-modes: [ hybrid, remote ]
+
+    upwork:
+      enabled: true
+      priority: EXPERIMENTAL
+      filters:
+        query: "java spring rest"
+        min-budget-usd: 500
+        remote-only: true

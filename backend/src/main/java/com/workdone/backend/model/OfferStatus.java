@@ -5,5 +5,6 @@ public enum OfferStatus {
     ANALYZED,
     APPLIED,
     REJECTED,
-    GHOST_JOB
+    GHOST_JOB,
+    ARCHIVED
 }

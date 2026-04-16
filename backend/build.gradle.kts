@@ -22,9 +22,22 @@ configurations {
 
 repositories {
     mavenCentral()
+    // Repozytorium dla wersji Milestone Spring AI
+    maven { url = uri("https://repo.spring.io/milestone") }
+}
+
+// Zarządzanie wersjami Spring AI
+dependencyManagement {
+    imports {
+        mavenBom("org.springframework.ai:spring-ai-bom:1.0.0-M6")
+    }
 }
 
 dependencies {
+    // === AI & WEKTORY ===
+    implementation("org.springframework.ai:spring-ai-google-ai-gemini-spring-boot-starter")
+    implementation("org.springframework.ai:spring-ai-pgvector-store-spring-boot-starter")
+
     // === BAZA DANYCH ===
     implementation("org.postgresql:postgresql")
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
@@ -52,8 +65,6 @@ dependencies {
     // === TESTY ===
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.kafka:spring-kafka-test")
-
-    // H2 tylko do szybkich testów integracyjnych
     testRuntimeOnly("com.h2database:h2")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
