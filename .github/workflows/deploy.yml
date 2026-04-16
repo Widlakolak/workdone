@@ -34,9 +34,10 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GHCR_TOKEN }}
 
-      - name: Build & push backend
+      - name: Build & Push Backend
         run: |
-          # Zamiana nazwy repozytorium na małe litery dla Dockera
-          IMAGE_NAME=$(echo "ghcr.io/${{ github.repository }}:latest" | tr '[:upper:]' '[:lower:]')
-          docker build -t $IMAGE_NAME .
-          docker push $IMAGE_NAME
+          REPO_NAME=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          IMAGE_ID="ghcr.io/${REPO_NAME}/backend"
+          echo "Building image: $IMAGE_ID:latest"
+          docker build -t $IMAGE_ID:latest ./backend
+          docker push $IMAGE_ID:latest
