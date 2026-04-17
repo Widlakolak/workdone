@@ -7,6 +7,8 @@ System cyklicznie zbiera ogłoszenia, analizuje dopasowanie do profilu kandydata
 
 ## ✅ Aktualny cel (bez Sprintu 5 / bez frontendu)
 
+[![Build & Push WorkDone](https://github.com/Widlakolak/workdone/actions/workflows/deploy.yml/badge.svg)](https://github.com/Widlakolak/workdone/actions/workflows/deploy.yml)
+
 MVP działa bez UI i jest obsługiwane przez:
 - harmonogram (`@Scheduled`),
 - pliki profilu wrzucane do katalogu wejściowego,
