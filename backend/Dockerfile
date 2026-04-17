@@ -1,18 +1,19 @@
-# Etap 1: Budowanie aplikacji
-FROM maven:3.9.6-eclipse-temurin-21-alpine AS build
+# Etap 1: Budowanie
+FROM gradle:8.6-jdk21-alpine AS build
 WORKDIR /app
-COPY pom.xml .
-COPY src ./src
-RUN mvn clean package -DskipTests
 
-# Etap 2: Środowisko uruchomieniowe (JRE)
+COPY build.gradle.kts settings.gradle.kts ./
+COPY src ./src
+
+RUN gradle bootJar --no-daemon
+
+# Etap 2: Środowisko (JRE)
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
 
-# Optymalizacja pod QNAP (limit RAM)
 ENV JAVA_OPTS="-Xmx512m -Xms256m"
 
-COPY --from=build /app/target/*.jar app.jar
+COPY --from=build /app/build/libs/workdone-backend.jar app.jar
 
 EXPOSE 8080
 
