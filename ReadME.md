@@ -23,7 +23,7 @@ MVP działa bez UI i jest obsługiwane przez:
 - **Architektura:** Modular Monolith / Event-Driven ready
 - **Messaging (kolejne etapy):** Apache Kafka (KRaft)
 - **Baza danych:** PostgreSQL + pgvector (docelowo)
-- **AI:** Gemini API (kolejne etapy), obecnie scoring MVP oparty o profil + `must-have`
+- **AI:** Spring AI 2.0.0-M4 (`ChatClient` dla scoringu i `EmbeddingModel` dla embeddingów), provider Gemini/OpenAI konfigurowany przez `spring.ai.*`  
 - **Operacje:** Docker + QNAP NAS + Cloudflare Tunnel
 - **Kanał użytkownika:** Discord (instant alerts + digest + interakcje)
 
@@ -73,7 +73,8 @@ MVP działa bez UI i jest obsługiwane przez:
 4. **Storage** – store MVP + deduplikacja
 5. **Notification** – Discord instant/digest
 6. **Interaction** – `DiscordInteractionController` (`Applied` / `Reject` → update statusu)
-7. **Profile** – budowanie kontekstu kandydata z katalogu wejściowego
+7. **Profile** – budowanie kontekstu kandydata z katalogu wejściowego  
+8. **Spring AI Integration** – `OfferScoringService` (ChatClient) oraz `OfferEmbeddingService` (EmbeddingModel) gotowe do podpięcia w pipeline ingestion/analysis
 
 ---
 
