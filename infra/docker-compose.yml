@@ -56,10 +56,9 @@ services:
       postgres-workdone:
         condition: service_healthy
     environment:
-      GEMINI_API_KEY: ${GEMINI_API_KEY}
-      GOOGLE_GENAI_PROJECT_ID: ${GOOGLE_GENAI_PROJECT_ID}
-      SPRING_AI_MODEL_CHAT: none
-      SPRING_AI_MODEL_EMBEDDING_TEXT: none
+      SPRING_AI_GOOGLE_GENAI_API_KEY: ${GEMINI_API_KEY}
+      SPRING_AI_OPENAI_API_KEY: ${OPENAI_API_KEY}
+      SPRING_AI_MODEL_EMBEDDING_PROVIDER: openai
       DB_HOST: postgres-workdone
       DB_PORT: 5432
       DB_NAME: workdonesql
