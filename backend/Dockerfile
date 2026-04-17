@@ -1,11 +1,18 @@
 # Etap 1: Budowanie
-FROM gradle:8.6-jdk21-alpine AS build
+FROM gradle:8-jdk21 AS build
 WORKDIR /app
 
-COPY build.gradle.kts settings.gradle.kts ./
+COPY gradlew .
+COPY gradle gradle
+COPY build.gradle.kts .
+COPY settings.gradle.kts .
+
+RUN chmod +x gradlew
+
+RUN ./gradlew dependencies --no-daemon
 COPY src ./src
 
-RUN gradle bootJar --no-daemon
+RUN ./gradlew bootJar -x test --no-daemon
 
 # Etap 2: Środowisko (JRE)
 FROM eclipse-temurin:21-jre-alpine
