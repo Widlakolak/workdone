@@ -31,11 +31,8 @@ spring:
         location: europe-west1
     model:
       embedding:
-        google:
-          genai:
-            api-key: ${GEMINI_API_KEY:}
-            project-id: ${GOOGLE_GENAI_PROJECT_ID}
-            location: europe-west1
+        enabled: true
+        provider: google
     vectorstore:
       pgvector:
         initialize-schema: true
