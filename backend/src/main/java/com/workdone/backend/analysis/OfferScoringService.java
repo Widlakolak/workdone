@@ -49,7 +49,11 @@ public class OfferScoringService {
         double normalizedScore = clamp(response.score(), 0.0, 100.0);
         String reasoning = response.reasoning() == null ? "" : response.reasoning().trim();
 
-        return new OfferScoringResult(normalizedScore, response.mustHaveSatisfied(), reasoning);
+        return new OfferScoringResult(
+                normalizedScore,
+                response.mustHaveMissing().isEmpty(),
+                reasoning
+        );
     }
 
     private String buildUserPrompt(JobOfferRecord offer) {
@@ -90,6 +94,9 @@ public class OfferScoringService {
         return Math.max(min, Math.min(max, value));
     }
 
-    private record LlmScoringPayload(double score, boolean mustHaveSatisfied, String reasoning) {
-    }
+    private record LlmScoringPayload(
+            int score,
+            List<String> mustHaveMissing,
+            String reasoning
+    ) {}
 }

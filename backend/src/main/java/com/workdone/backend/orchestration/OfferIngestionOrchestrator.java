@@ -1,9 +1,6 @@
 package com.workdone.backend.orchestration;
 
-import com.workdone.backend.analysis.MatchingBand;
-import com.workdone.backend.analysis.OfferClassificationService;
-import com.workdone.backend.analysis.OfferFingerprintFactory;
-import com.workdone.backend.analysis.OfferMatchingService;
+import com.workdone.backend.analysis.*;
 import com.workdone.backend.config.WorkDoneProperties;
 import com.workdone.backend.ingestion.JobProvider;
 import com.workdone.backend.model.JobOfferRecord;
@@ -31,11 +28,13 @@ public class OfferIngestionOrchestrator {
     private final InMemoryOfferStore store;
     private final DiscordNotifier notifier;
     private final WorkDoneProperties properties;
+    private final OfferAnalysisFacade analysisFacade;
 
     public OfferIngestionOrchestrator(List<JobProvider> providers,
                                       OfferFingerprintFactory fingerprintFactory,
                                       OfferMatchingService matchingService,
                                       OfferClassificationService classificationService,
+                                      OfferAnalysisFacade analysisFacade,
                                       InMemoryOfferStore store,
                                       DiscordNotifier notifier,
                                       WorkDoneProperties properties) {
@@ -46,6 +45,7 @@ public class OfferIngestionOrchestrator {
         this.store = store;
         this.notifier = notifier;
         this.properties = properties;
+        this.analysisFacade = analysisFacade;
     }
 
     @Scheduled(cron = "${workdone.scheduling.ingestion-cron}", zone = "${workdone.scheduling.zone-id}")
@@ -61,12 +61,11 @@ public class OfferIngestionOrchestrator {
                     continue;
                 }
 
-                double score = matchingService.score(offer);
-                MatchingBand band = classificationService.classify(score);
-                JobOfferRecord analyzed = offer.withAnalysis(score, classificationService.toStatus(band));
+                JobOfferRecord analyzed = analysisFacade.analyze(offer);
 
                 store.upsert(analyzed);
-                if (band == MatchingBand.INSTANT) {
+                if (analyzed.matchingScore() != null
+                        && analyzed.matchingScore() >= properties.matching().instantThreshold()) {
                     notifier.sendInstant(analyzed);
                 }
             }
