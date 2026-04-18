@@ -9,6 +9,9 @@ spring:
     username: sa
     password: ""
 
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+
   flyway:
     enabled: false
 
@@ -23,3 +26,9 @@ spring:
       - org.springframework.ai.vectorstore.pgvector.autoconfigure.PgVectorStoreAutoConfiguration
       - org.springframework.ai.model.google.genai.autoconfigure.embedding.GoogleGenAiEmbeddingConnectionAutoConfiguration
       - org.springframework.ai.model.google.genai.autoconfigure.embedding.GoogleGenAiTextEmbeddingAutoConfiguration
+
+workdone:
+  discord:
+    enabled: false
+  providers:
+    enabled: false

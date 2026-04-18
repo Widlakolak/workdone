@@ -41,4 +41,22 @@ public record JobOfferRecord(
                 sourcePlatform
         );
     }
+
+    public JobOfferRecord withMatchingScore(Double score) {
+        return new JobOfferRecord(
+                this.id(),
+                this.fingerprint(),
+                this.title(),
+                this.companyName(),
+                this.sourceUrl(),
+                this.location(),
+                this.rawDescription(),
+                this.salaryRange(),
+                this.techStack(),
+                score,
+                this.status(),
+                this.publishedAt(),
+                this.sourcePlatform()
+        );
+    }
 }

@@ -2,20 +2,9 @@ spring:
   application:
     name: backend
 
-#  datasource:
-#    url: jdbc:h2:mem:test
-#    driver-class-name: org.h2.Driver
-#    username: sa
-#    password:
-#
-#  jpa:
-#    database-platform: org.hibernate.dialect.H2Dialect
-#
-#  flyway:
-#    enabled: false
-
   datasource:
-    url: jdbc:postgresql://${DB_HOST:postgres}:${DB_PORT:5432}/${DB_NAME:workdonesql}
+    url: jdbc:postgresql://localhost:5432/workdonesql
+#    url: jdbc:postgresql://${DB_HOST:postgres}:${DB_PORT:5432}/${DB_NAME:workdonesql}
     username: ${DB_USERNAME:devuser}
     password: ${DB_PASSWORD:devpassword}
     driver-class-name: org.postgresql.Driver
@@ -41,7 +30,7 @@ spring:
         api-key: ${GEMINI_API_KEY:}
         chat:
           options:
-            model: gemini-2.0-flash
+            model: gemini-2.5-flash-lite
     openai:
       api-key: ${OPENAI_API_KEY:}
     model:
@@ -53,7 +42,7 @@ spring:
       pgvector:
         initialize-schema: true
         index-type: HNSW
-        distance-type: COSINE
+        distance-type: COSINE_DISTANCE
         dimensions: 768
 
   kafka:
@@ -67,6 +56,8 @@ workdone:
     input-directory: /data/workdone/profile-input
 
   matching:
+    ai-threshold-min: 50.0
+    ai-threshold-max: 85.0
     instant-threshold: 90.0
     digest-threshold: 60.0
     archive-threshold: 40.0

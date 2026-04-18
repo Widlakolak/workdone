@@ -2,7 +2,7 @@ package com.workdone.backend.analysis;
 
 import com.workdone.backend.config.WorkDoneProperties;
 import com.workdone.backend.model.JobOfferRecord;
-import com.workdone.backend.profile.CandidateProfileService;
+import com.workdone.backend.profile.service.CvAggregationService;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -12,15 +12,35 @@ import java.util.Locale;
 public class OfferMatchingService {
 
     private final WorkDoneProperties properties;
-    private final CandidateProfileService profileService;
+    private final CvAggregationService cvAggregationService;
 
-    public OfferMatchingService(WorkDoneProperties properties, CandidateProfileService profileService) {
+    private volatile String cachedProfile;
+
+    public OfferMatchingService(WorkDoneProperties properties,
+                                CvAggregationService cvAggregationService) {
         this.properties = properties;
-        this.profileService = profileService;
+        this.cvAggregationService = cvAggregationService;
+    }
+
+    private String getProfile() {
+        if (cachedProfile == null) {
+            synchronized (this) {
+                if (cachedProfile == null) {
+                    cachedProfile = cvAggregationService.buildMergedProfile();
+                }
+            }
+        }
+        return cachedProfile;
+    }
+
+    public double quickScore(JobOfferRecord offer) {
+        return score(offer);
     }
 
     public double score(JobOfferRecord offer) {
-        String context = (profileService.profileContext() + " " + offer.rawDescription() + " " + offer.techStack())
+        String profile = getProfile();
+
+        String context = (profile + " " + offer.rawDescription() + " " + offer.techStack())
                 .toLowerCase(Locale.ROOT);
 
         List<String> mustHave = properties.matching().mustHaveKeywords();

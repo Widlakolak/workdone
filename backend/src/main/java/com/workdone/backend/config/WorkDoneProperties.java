@@ -16,11 +16,14 @@ public record WorkDoneProperties(
     public record Profile(String inputDirectory) {
     }
 
-    public record Matching(double instantThreshold,
-                           double digestThreshold,
-                           double archiveThreshold,
-                           List<String> mustHaveKeywords) {
-    }
+    public record Matching(
+            double instantThreshold,
+            double digestThreshold,
+            double archiveThreshold,
+            List<String> mustHaveKeywords,
+            double aiThresholdMin,
+            double aiThresholdMax
+    ) {}
 
     public record Scheduling(String ingestionCron, String digestCron, String zoneId) {
     }
@@ -36,15 +39,13 @@ public record WorkDoneProperties(
             ProviderConfig nofluffjobs,
             ProviderConfig theprotocol,
             ProviderConfig upwork
-    ) {
-    }
+    ) {}
 
     public record ProviderConfig(
             boolean enabled,
             String priority,
             Filters filters
-    ) {
-    }
+    ) {}
 
     public record Filters(
             List<String> keywords,
@@ -53,6 +54,5 @@ public record WorkDoneProperties(
             Boolean allowHybrid,
             String query,
             Integer minBudgetUsd
-    ) {
-    }
+    ) {}
 }

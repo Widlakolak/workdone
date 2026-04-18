@@ -29,12 +29,14 @@ public class OfferIngestionOrchestrator {
     private final DiscordNotifier notifier;
     private final WorkDoneProperties properties;
     private final OfferAnalysisFacade analysisFacade;
+    private final OfferDeduplicationService deduplicationService;
 
     public OfferIngestionOrchestrator(List<JobProvider> providers,
                                       OfferFingerprintFactory fingerprintFactory,
                                       OfferMatchingService matchingService,
                                       OfferClassificationService classificationService,
                                       OfferAnalysisFacade analysisFacade,
+                                      OfferDeduplicationService deduplicationService,
                                       InMemoryOfferStore store,
                                       DiscordNotifier notifier,
                                       WorkDoneProperties properties) {
@@ -46,22 +48,43 @@ public class OfferIngestionOrchestrator {
         this.notifier = notifier;
         this.properties = properties;
         this.analysisFacade = analysisFacade;
+        this.deduplicationService = deduplicationService;
     }
 
     @Scheduled(cron = "${workdone.scheduling.ingestion-cron}", zone = "${workdone.scheduling.zone-id}")
     public void runIngestion() {
         for (JobProvider provider : providers) {
             List<JobOfferRecord> offers = provider.fetchOffers().stream()
-                    .map(this::enrichIdentity)
                     .filter(offer -> !store.existsBySourceOrFingerprint(offer))
+                    .map(this::enrichIdentity)
                     .toList();
 
             for (JobOfferRecord offer : offers) {
+                if (deduplicationService.isDuplicate(offer.rawDescription())) {
+                    log.info("Duplicate offer skipped: {}", offer.sourceUrl());
+                    continue;
+                }
+
                 if (!matchingService.passesMustHave(offer)) {
                     continue;
                 }
 
-                JobOfferRecord analyzed = analysisFacade.analyze(offer);
+                double quickScore = matchingService.quickScore(offer);
+
+                if (quickScore < properties.matching().aiThresholdMin()) {
+                    // ❌ za słabe → odrzucamy bez AI
+                    continue;
+                }
+
+                JobOfferRecord analyzed;
+
+                if (quickScore >= properties.matching().aiThresholdMax()) {
+                    // ✅ bardzo dobre → NIE używamy AI
+                    analyzed = offer.withMatchingScore(quickScore);
+                } else {
+                    // ⚠ borderline → używamy AI
+                    analyzed = analysisFacade.analyze(offer);
+                }
 
                 store.upsert(analyzed);
                 if (analyzed.matchingScore() != null

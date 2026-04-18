@@ -13,7 +13,7 @@ class OfferClassificationServiceTest {
     private final OfferClassificationService service = new OfferClassificationService(
             new WorkDoneProperties(
                     new WorkDoneProperties.Profile("/tmp"),
-                    new WorkDoneProperties.Matching(90.0, 60.0, 40.0, List.of("java")),
+                    new WorkDoneProperties.Matching(90.0, 60.0, 40.0, List.of("java"), 50, 85),
                     new WorkDoneProperties.Scheduling("0 0 */2 * * *", "0 0 18 * * *", "Europe/Warsaw"),
                     new WorkDoneProperties.Discord(
                             new WorkDoneProperties.Webhook(false, ""),

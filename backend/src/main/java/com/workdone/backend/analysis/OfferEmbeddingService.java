@@ -8,7 +8,7 @@ import org.springframework.stereotype.Service;
 import java.util.Objects;
 
 @Service
-@ConditionalOnBean(EmbeddingModel.class)
+//@ConditionalOnBean(EmbeddingModel.class)
 public class OfferEmbeddingService {
 
     private final EmbeddingModel embeddingModel;

@@ -8,6 +8,8 @@ services:
   # ==========================================
   postgres-workdone:
     image: ankane/pgvector:latest
+    ports:
+      - "5432:5432"
     container_name: workdone-postgres
     restart: unless-stopped
     environment:
@@ -84,8 +86,8 @@ services:
     command: tunnel --no-autoupdate run --protocol http2
     environment:
       TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN}
-    depends_on:
-      - nginx
+#    depends_on:
+ #     - nginx
     networks:
       - shared-net
 

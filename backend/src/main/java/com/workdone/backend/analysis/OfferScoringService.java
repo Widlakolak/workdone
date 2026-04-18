@@ -2,16 +2,14 @@ package com.workdone.backend.analysis;
 
 import com.workdone.backend.config.WorkDoneProperties;
 import com.workdone.backend.model.JobOfferRecord;
-import com.workdone.backend.profile.CandidateProfileService;
+import com.workdone.backend.profile.service.CvAggregationService;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Objects;
 
 @Service
-@ConditionalOnBean(ChatClient.Builder.class)
 public class OfferScoringService {
 
     private static final String SYSTEM_PROMPT = """
@@ -25,20 +23,36 @@ public class OfferScoringService {
 
     private final ChatClient chatClient;
     private final WorkDoneProperties properties;
-    private final CandidateProfileService profileService;
+    private final CvAggregationService cvAggregationService;
+
+    private volatile String cachedProfile;
 
     public OfferScoringService(ChatClient.Builder chatClientBuilder,
                                WorkDoneProperties properties,
-                               CandidateProfileService profileService) {
+                               CvAggregationService cvAggregationService) {
         this.chatClient = chatClientBuilder.build();
         this.properties = properties;
-        this.profileService = profileService;
+        this.cvAggregationService = cvAggregationService;
+    }
+
+    private String getProfile() {
+        if (cachedProfile == null) {
+            synchronized (this) {
+                if (cachedProfile == null) {
+                    cachedProfile = cvAggregationService.buildMergedProfile();
+                }
+            }
+        }
+        return cachedProfile;
     }
 
     public OfferScoringResult score(JobOfferRecord offer) {
+
+        String profile = getProfile();
+
         LlmScoringPayload response = chatClient.prompt()
                 .system(SYSTEM_PROMPT)
-                .user(buildUserPrompt(offer))
+                .user(buildUserPrompt(offer, profile))
                 .call()
                 .entity(LlmScoringPayload.class);
 
@@ -56,7 +70,7 @@ public class OfferScoringService {
         );
     }
 
-    private String buildUserPrompt(JobOfferRecord offer) {
+    private String buildUserPrompt(JobOfferRecord offer, String profile) {
         List<String> mustHave = properties.matching().mustHaveKeywords();
         String mustHaveLine = (mustHave == null || mustHave.isEmpty())
                 ? "none"
@@ -76,7 +90,7 @@ public class OfferScoringService {
                 Description:
                 %s
                 """.formatted(
-                profileService.profileContext(),
+                profile,
                 mustHaveLine,
                 defaultText(offer.title()),
                 defaultText(offer.companyName()),
