@@ -26,11 +26,6 @@ dependencyManagement {
     }
 }
 
-repositories {
-    mavenCentral()
-    maven { url = uri("https://repo.spring.io/milestone") }
-}
-
 dependencies {
     // === AI & WEKTORY ===
     implementation("org.springframework.ai:spring-ai-starter-model-openai")

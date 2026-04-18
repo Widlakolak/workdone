@@ -51,7 +51,7 @@ public class OfferScoringService {
 
         return new OfferScoringResult(
                 normalizedScore,
-                response.mustHaveMissing().isEmpty(),
+                response.mustHaveSatisfied(),
                 reasoning
         );
     }
@@ -96,7 +96,7 @@ public class OfferScoringService {
 
     private record LlmScoringPayload(
             int score,
-            List<String> mustHaveMissing,
+            boolean mustHaveSatisfied,
             String reasoning
     ) {}
 }

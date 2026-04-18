@@ -2,6 +2,18 @@ spring:
   application:
     name: backend
 
+#  datasource:
+#    url: jdbc:h2:mem:test
+#    driver-class-name: org.h2.Driver
+#    username: sa
+#    password:
+#
+#  jpa:
+#    database-platform: org.hibernate.dialect.H2Dialect
+#
+#  flyway:
+#    enabled: false
+
   datasource:
     url: jdbc:postgresql://${DB_HOST:postgres}:${DB_PORT:5432}/${DB_NAME:workdonesql}
     username: ${DB_USERNAME:devuser}
@@ -26,13 +38,14 @@ spring:
   ai:
     google:
       genai:
-        vertex-ai: true
         api-key: ${GEMINI_API_KEY:}
-        project-id: ${GOOGLE_GENAI_PROJECT_ID}
-        location: europe-west1
+        chat:
+          options:
+            model: gemini-2.0-flash
     openai:
       api-key: ${OPENAI_API_KEY:}
     model:
+      chat: google-genai
       embedding:
         enabled: true
         provider: openai
