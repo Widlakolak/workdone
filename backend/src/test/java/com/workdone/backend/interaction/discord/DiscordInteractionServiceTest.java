@@ -26,6 +26,7 @@ class DiscordInteractionServiceTest {
                 "",
                 List.of("Java"),
                 95.0,
+                95.0,
                 OfferStatus.ANALYZED,
                 LocalDateTime.now(),
                 "JUST_JOIN_IT"

@@ -19,28 +19,28 @@ public class BackendApplication {
         SpringApplication.run(BackendApplication.class, args);
     }
 
-    @Bean
-    @Profile("!test")
-    CommandLineRunner test(ChatClient.Builder builder) {
-        return args -> {
-            System.out.println("BUILDER: " + builder);
+//    @Bean
+//    @Profile("!test")
+//    CommandLineRunner test(ChatClient.Builder builder) {
+//        return args -> {
+//            System.out.println("BUILDER: " + builder);
+//
+//            ChatClient client = builder.build();
+//
+//            String response = client.prompt()
+//                    .user("Say hello in one sentence")
+//                    .call()
+//                    .content();
+//
+//            System.out.println("AI RESPONSE: " + response);
+//        };
+//    }
 
-            ChatClient client = builder.build();
-
-            String response = client.prompt()
-                    .user("Say hello in one sentence")
-                    .call()
-                    .content();
-
-            System.out.println("AI RESPONSE: " + response);
-        };
-    }
-
-    @Bean
-    CommandLineRunner testCv(CvAggregationService service) {
-        return args -> {
-            String profile = service.buildMergedProfile();
-            System.out.println("CV PROFILE:\n" + profile);
-        };
-    }
+//    @Bean
+//    CommandLineRunner testCv(CvAggregationService service) {
+//        return args -> {
+//            String profile = service.buildMergedProfile();
+//            System.out.println("CV PROFILE:\n" + profile);
+//        };
+//    }
 }

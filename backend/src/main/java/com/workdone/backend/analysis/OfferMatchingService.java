@@ -13,13 +13,16 @@ public class OfferMatchingService {
 
     private final WorkDoneProperties properties;
     private final CvAggregationService cvAggregationService;
+    private final MustHaveGroupConfig groupConfig;
 
     private volatile String cachedProfile;
 
     public OfferMatchingService(WorkDoneProperties properties,
-                                CvAggregationService cvAggregationService) {
+                                CvAggregationService cvAggregationService,
+                                MustHaveGroupConfig groupConfig) {
         this.properties = properties;
         this.cvAggregationService = cvAggregationService;
+        this.groupConfig = groupConfig;
     }
 
     private String getProfile() {
@@ -49,7 +52,7 @@ public class OfferMatchingService {
         }
 
         long matched = mustHave.stream()
-                .map(keyword -> keyword.toLowerCase(Locale.ROOT))
+                .map(k -> k.toLowerCase(Locale.ROOT))
                 .filter(context::contains)
                 .count();
 
@@ -58,16 +61,35 @@ public class OfferMatchingService {
     }
 
     public boolean passesMustHave(JobOfferRecord offer) {
-        List<String> mustHave = properties.matching().mustHaveKeywords();
-        if (mustHave == null || mustHave.isEmpty()) {
-            return true;
-        }
 
         String context = (offer.title() + " " + offer.rawDescription() + " " + offer.techStack())
                 .toLowerCase(Locale.ROOT);
 
-        return mustHave.stream()
-                .map(keyword -> keyword.toLowerCase(Locale.ROOT))
-                .allMatch(context::contains);
+        List<MustHaveGroup> groups = groupConfig.groups();
+
+        int matchedGroups = 0;
+
+        for (MustHaveGroup group : groups) {
+            boolean matched = containsAny(context, group.keywords());
+
+            if (matched) {
+                matchedGroups++;
+            } else if (group.required()) {
+                return false;
+            }
+        }
+
+        return matchedGroups >= groupConfig.minGroupsToPass();
+    }
+
+    private boolean containsAny(String text, List<String> keywords) {
+        return keywords.stream()
+                .anyMatch(k -> text.contains(normalize(k)));
+    }
+
+    private String normalize(String s) {
+        return s.toLowerCase()
+                .replace("-", "")
+                .replace(" ", "");
     }
 }

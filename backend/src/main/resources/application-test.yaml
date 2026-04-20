@@ -31,4 +31,9 @@ workdone:
   discord:
     enabled: false
   providers:
-    enabled: false
+    jooble:
+      enabled: true
+      api-key: ${JOOBLE_API_KEY}
+    justjoinit:
+      filters:
+        enabled: false

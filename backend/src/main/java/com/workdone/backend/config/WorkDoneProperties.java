@@ -35,10 +35,7 @@ public record WorkDoneProperties(
     }
 
     public record Providers(
-            ProviderConfig justjoinit,
-            ProviderConfig nofluffjobs,
-            ProviderConfig theprotocol,
-            ProviderConfig upwork
+            ProviderConfig jooble
     ) {}
 
     public record ProviderConfig(

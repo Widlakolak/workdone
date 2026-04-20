@@ -1,12 +1,15 @@
 package com.workdone.backend.notification;
 
 import com.workdone.backend.config.WorkDoneProperties;
+import com.workdone.backend.format.OfferContentBuilder;
 import com.workdone.backend.model.JobOfferRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
+
+import static org.apache.kafka.common.utils.Utils.safe;
 
 import java.util.List;
 import java.util.Map;
@@ -18,10 +21,12 @@ public class DiscordNotifier {
 
     private final RestClient client;
     private final WorkDoneProperties properties;
+    private final OfferContentBuilder contentBuilder;
 
-    public DiscordNotifier(WorkDoneProperties properties) {
+    public DiscordNotifier(WorkDoneProperties properties, OfferContentBuilder contentBuilder) {
         this.client = RestClient.create();
         this.properties = properties;
+        this.contentBuilder = contentBuilder;
     }
 
     public void sendInstant(JobOfferRecord offer) {
@@ -29,11 +34,7 @@ public class DiscordNotifier {
             return;
         }
 
-        String content = "🔥 **Instant Match >=90%**\n"
-                + offer.title() + " @ " + offer.companyName() + "\n"
-                + "Score: " + offer.matchingScore() + "%\n"
-                + offer.sourceUrl();
-
+        String content = contentBuilder.buildInstantMessage(offer);
         post(properties.discord().instant().url(), instantPayload(content, offer.sourceUrl()));
     }
 
@@ -42,21 +43,8 @@ public class DiscordNotifier {
             return;
         }
 
-        StringBuilder message = new StringBuilder("📋 **Daily Digest (>=60%)**\n");
-        offers.stream()
-                .limit(20)
-                .forEach(offer -> message
-                        .append("- ")
-                        .append(offer.title())
-                        .append(" @ ")
-                        .append(offer.companyName())
-                        .append(" [")
-                        .append(offer.matchingScore())
-                        .append("%]\n")
-                        .append(offer.sourceUrl())
-                        .append("\n"));
-
-        post(properties.discord().digest().url(), Map.of("content", message.toString()));
+        String content = contentBuilder.buildDigestMessage(offers);
+        post(properties.discord().digest().url(), Map.of("content", content));
     }
 
     private Object instantPayload(String content, String sourceUrl) {
