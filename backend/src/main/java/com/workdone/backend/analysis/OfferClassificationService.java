@@ -1,30 +1,30 @@
 package com.workdone.backend.analysis;
 
-import com.workdone.backend.config.WorkDoneProperties;
 import com.workdone.backend.model.OfferStatus;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 @Service
+@RequiredArgsConstructor
 public class OfferClassificationService {
 
-    private final WorkDoneProperties properties;
+    private final DynamicConfigService dynamicConfig;
 
-    public OfferClassificationService(WorkDoneProperties properties) {
-        this.properties = properties;
-    }
-
-    public MatchingBand classify(Double score) {
-        if (score == null) return MatchingBand.ARCHIVE;
-        if (score >= properties.matching().instantThreshold()) return MatchingBand.INSTANT;
-        if (score >= properties.matching().digestThreshold()) return MatchingBand.DIGEST;
-        if (score >= properties.matching().archiveThreshold()) return MatchingBand.TRACK_ONLY;
-        return MatchingBand.ARCHIVE;
+    public MatchingBand classify(double score) {
+        // Przypisuję ofertę do "kubełka" na podstawie punktacji. 
+        // Progi mogę zmieniać w locie przez bota, więc pobieram je z DynamicConfigService.
+        if (score >= dynamicConfig.getInstantThreshold()) return MatchingBand.INSTANT; // Najlepsze, powiadomienie od razu
+        if (score >= dynamicConfig.getDigestThreshold()) return MatchingBand.DIGEST;   // Dobre, trafią do raportu dziennego
+        if (score >= dynamicConfig.getArchiveThreshold()) return MatchingBand.TRACKING; // Słabe, ale zostawiam w bazie do śledzenia
+        return MatchingBand.ARCHIVED; // Odpady, chowam do archiwum
     }
 
     public OfferStatus toStatus(MatchingBand band) {
         return switch (band) {
-            case ARCHIVE -> OfferStatus.ARCHIVED;
-            case INSTANT, DIGEST, TRACK_ONLY -> OfferStatus.ANALYZED;
+            case INSTANT -> OfferStatus.NEW;
+            case DIGEST -> OfferStatus.NEW;
+            case TRACKING -> OfferStatus.ANALYZED;
+            case ARCHIVED -> OfferStatus.ARCHIVED;
         };
     }
 }

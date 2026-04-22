@@ -1,23 +1,43 @@
 package com.workdone.backend.analysis;
 
 import com.workdone.backend.model.JobOfferRecord;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.embedding.EmbeddingModel;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
 import java.util.Objects;
 
+@Slf4j
 @Service
-//@ConditionalOnBean(EmbeddingModel.class)
 public class OfferEmbeddingService {
 
-    private final EmbeddingModel embeddingModel;
+    private final EmbeddingModel cohereModel;
+    private final EmbeddingModel openAiModel;
 
-    public OfferEmbeddingService(EmbeddingModel embeddingModel) {
-        this.embeddingModel = embeddingModel;
+    public OfferEmbeddingService(
+            @Qualifier("fallbackEmbeddingModel") EmbeddingModel cohereModel,
+            @Qualifier("openAiEmbeddingModel") EmbeddingModel openAiModel) {
+        this.cohereModel = cohereModel;
+        this.openAiModel = openAiModel;
     }
 
-    public float[] embed(JobOfferRecord offer) {
+    public float[] embed(String text) {
+        try {
+            log.debug("🔍 Próbuję wygenerować embedding przez Cohere...");
+            return cohereModel.embed(text);
+        } catch (Exception e) {
+            log.warn("⚠️ Błąd Cohere, próbuję fallback na OpenAI: {}", e.getMessage());
+            try {
+                return openAiModel.embed(text);
+            } catch (Exception ex) {
+                log.error("❌ Oba modele embeddingu zawiodły!");
+                throw ex;
+            }
+        }
+    }
+
+    public float[] embedOffer(JobOfferRecord offer) {
         String input = """
                 title: %s
                 company: %s
@@ -32,7 +52,7 @@ public class OfferEmbeddingService {
                 defaultText(offer.rawDescription())
         );
 
-        return embeddingModel.embed(input);
+        return embed(input);
     }
 
     private static String defaultText(String value) {

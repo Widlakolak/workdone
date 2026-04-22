@@ -2,54 +2,37 @@ package com.workdone.backend.analysis;
 
 import com.workdone.backend.format.OfferContentBuilder;
 import com.workdone.backend.model.JobOfferRecord;
-import com.workdone.backend.storage.OfferVectorStore;
+import com.workdone.backend.notification.DiscordNotifier;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+@Slf4j
 @Service
+@RequiredArgsConstructor
 public class OfferAnalysisFacade {
 
-    private final OfferMatchingService matchingService;
     private final OfferScoringService scoringService;
-    private final OfferClassificationService classificationService;
-    private final OfferVectorStore vectorStore;
     private final OfferContentBuilder contentBuilder;
-    private final OfferPriorityService priorityService;
+    private final DiscordNotifier discordNotifier; // Wstrzykujemy DiscordNotifier
 
-    public OfferAnalysisFacade(OfferMatchingService matchingService,
-                               OfferScoringService scoringService,
-                               OfferClassificationService classificationService,
-                               OfferVectorStore vectorStore,
-                               OfferContentBuilder contentBuilder,
-                               OfferPriorityService priorityService) {
-        this.matchingService = matchingService;
-        this.scoringService = scoringService;
-        this.classificationService = classificationService;
-        this.vectorStore = vectorStore;
-        this.contentBuilder = contentBuilder;
-        this.priorityService = priorityService;
-    }
-
-    public JobOfferRecord analyze(JobOfferRecord offer) {
+    /**
+     * Odpalam LLM-a do głębokiej analizy.
+     * Zwracam wynik punktowy od AI (0-100).
+     */
+    public Double performDeepAnalysis(JobOfferRecord offer) {
+        log.info("Starting deep AI analysis for: {}", offer.title());
+        
         String content = contentBuilder.buildTechnicalContent(offer);
 
-        vectorStore.save(offer, content);
-
-        double baseScore;
         try {
-            baseScore = scoringService.score(offer).score();
+            return scoringService.score(offer).score();
         } catch (Exception e) {
-            baseScore = matchingService.quickScore(offer);
+            String errorMessage = String.format("❌ Deep AI scoring failed for offer '%s', error: %s", offer.title(), e.getMessage());
+            log.warn(errorMessage, e);
+            discordNotifier.sendAiAlert(errorMessage); // Wysyłamy alert na Discorda
+            // Jeśli AI padnie (np. timeout), zwracam null, żeby orkiestrator wiedział, że ma użyć podobieństwa cosinusowego jako fallbacku
+            return null;
         }
-
-        double priority = priorityService.calculate(
-                offer.withMatchingScore(baseScore)
-        );
-
-        MatchingBand band = classificationService.classify(priority);
-
-        return offer
-                .withMatchingScore(baseScore)
-                .withPriorityScore(priority)
-                .withStatus(classificationService.toStatus(band));
     }
 }

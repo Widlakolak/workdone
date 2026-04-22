@@ -1,39 +1,28 @@
 spring:
-  config:
-    activate:
-      on-profile: test
-
-  datasource:
-    url: jdbc:h2:mem:workdone_test;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=PostgreSQL
-    driver-class-name: org.h2.Driver
-    username: sa
-    password: ""
-
   jpa:
-    database-platform: org.hibernate.dialect.H2Dialect
-
+    enabled: false
   flyway:
     enabled: false
-
-  ai:
-    model:
-      chat: none
-      embedding:
-        text: none
-
   autoconfigure:
     exclude:
-      - org.springframework.ai.vectorstore.pgvector.autoconfigure.PgVectorStoreAutoConfiguration
-      - org.springframework.ai.model.google.genai.autoconfigure.embedding.GoogleGenAiEmbeddingConnectionAutoConfiguration
-      - org.springframework.ai.model.google.genai.autoconfigure.embedding.GoogleGenAiTextEmbeddingAutoConfiguration
+      - org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
+      - org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration
+      - org.springframework.boot.autoconfigure.jdbc.DataSourceTransactionManagerAutoConfiguration
+      - org.springframework.boot.autoconfigure.flyway.FlywayAutoConfiguration
+  
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY:dummy}
+    google:
+      genai:
+        api-key: ${GEMINI_API_KEY:dummy}
+    groq:
+      api-key: ${GROQ_API_KEY:dummy}
+      base-url: https://api.groq.com/openai
+      model: llama-3.3-70b-versatile
+    cohere:
+      api-key: ${COHERE_API_KEY:dummy}
 
 workdone:
   discord:
-    enabled: false
-  providers:
-    jooble:
-      enabled: true
-      api-key: ${JOOBLE_API_KEY}
-    justjoinit:
-      filters:
-        enabled: false
+    public-key: ${DISCORD_PUBLIC_KEY:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef}

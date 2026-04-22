@@ -2,51 +2,41 @@ package com.workdone.backend.storage;
 
 import com.workdone.backend.model.JobOfferRecord;
 import com.workdone.backend.model.OfferStatus;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * Prosta baza danych w pamięci RAM, używana tylko w testach. 
+ * Dzięki temu testy biegają błyskawicznie i nie potrzebują prawdziwego Postgresa.
+ */
+@Slf4j
 @Component
-public class InMemoryOfferStore {
+@Profile("test")
+public class InMemoryOfferStore implements OfferStore {
 
     private final Map<String, JobOfferRecord> bySourceUrl = new ConcurrentHashMap<>();
     private final Map<String, JobOfferRecord> byFingerprint = new ConcurrentHashMap<>();
 
-    public void saveIfNew(JobOfferRecord offer) {
-        bySourceUrl.putIfAbsent(offer.sourceUrl(), offer);
-        byFingerprint.putIfAbsent(offer.fingerprint(), offer);
-    }
-
+    @Override
     public boolean existsBySourceOrFingerprint(JobOfferRecord offer) {
+        // Sprawdzam, czy mam już taką ofertę w mapach
         return bySourceUrl.containsKey(offer.sourceUrl()) || byFingerprint.containsKey(offer.fingerprint());
     }
 
+    @Override
     public void upsert(JobOfferRecord offer) {
         bySourceUrl.put(offer.sourceUrl(), offer);
         byFingerprint.put(offer.fingerprint(), offer);
     }
 
-    public boolean updateStatusBySourceUrl(String sourceUrl, OfferStatus newStatus) {
-        JobOfferRecord current = bySourceUrl.get(sourceUrl);
-        if (current == null) {
-            return false;
-        }
-
-        JobOfferRecord updated = current.withAnalysis(current.matchingScore(), newStatus);
-        bySourceUrl.put(sourceUrl, updated);
-        byFingerprint.put(updated.fingerprint(), updated);
-        return true;
-    }
-
-    public Collection<JobOfferRecord> all() {
-        return bySourceUrl.values();
-    }
-
+    @Override
     public List<JobOfferRecord> findForDigest(LocalDate today) {
         return bySourceUrl.values().stream()
                 .filter(offer -> offer.publishedAt() != null)
@@ -54,14 +44,19 @@ public class InMemoryOfferStore {
                 .toList();
     }
 
-    public List<JobOfferRecord> findByUrls(List<String> urls) {
-        List<JobOfferRecord> result = new ArrayList<>();
-        for (String url : urls) {
-            JobOfferRecord offer = bySourceUrl.get(url);
-            if (offer != null) {
-                result.add(offer);
-            }
-        }
-        return result;
+    @Override
+    public boolean updateStatusBySourceUrl(String sourceUrl, OfferStatus newStatus) {
+        JobOfferRecord current = bySourceUrl.get(sourceUrl);
+        if (current == null) return false;
+
+        JobOfferRecord updated = current.withStatus(newStatus);
+        bySourceUrl.put(sourceUrl, updated);
+        byFingerprint.put(updated.fingerprint(), updated);
+        return true;
+    }
+
+    @Override
+    public Optional<JobOfferRecord> findBySourceUrl(String sourceUrl) {
+        return Optional.ofNullable(bySourceUrl.get(sourceUrl));
     }
 }

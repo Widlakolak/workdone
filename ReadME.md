@@ -1,143 +1,102 @@
-# 🚀 WorkDone – AI Agent Rekrutacyjny (Backend-Only MVP)
+# 🚀 WorkDone – AI Agent Rekrutacyjny (Backend-Only)
 
-WorkDone to backendowe narzędzie, które działa 24/7 i pomaga znaleźć **realne oferty pracy**.  
-System cyklicznie zbiera ogłoszenia, analizuje dopasowanie do profilu kandydata i wysyła wyniki na Discord.
+WorkDone to inteligentny backendowy agent rekrutacyjny działający 24/7. System cyklicznie zbiera ogłoszenia o pracę, analizuje ich dopasowanie semantyczne do profilu kandydata (CV) przy użyciu modeli embeddingowych oraz LLM, a następnie przesyła wyselekcjonowane wyniki na Discord.
 
 ---
 
-## ✅ Aktualny cel (bez Sprintu 5 / bez frontendu)
+## ✅ Aktualny Status: AI-Native Refactor (ZREALIZOWANY ✔️)
 
 [![Build & Push WorkDone](https://github.com/Widlakolak/workdone/actions/workflows/deploy.yml/badge.svg)](https://github.com/Widlakolak/workdone/actions/workflows/deploy.yml)
 
-MVP działa bez UI i jest obsługiwane przez:
-- harmonogram (`@Scheduled`),
-- pliki profilu wrzucane do katalogu wejściowego,
-- Discord webhooki (instant + daily digest),
-- statusy ofert w backendzie.
-
----
-
-## ✅ Status projektu
-
-### ETAP 0 – ZREALIZOWANY ✔️
-
-System MVP działa end-to-end bez UI i obejmuje:
-
-- harmonogram (@Scheduled) – ingestion + digest
-- ingestion ofert z wielu źródeł
-- scoring (keyword + heurystyki)
-- priority scoring (stage 0)
-- deduplikacja (URL + fingerprint SHA-256)
-- profil kandydata z katalogu /data/workdone/profile-input
-- Discord (instant + daily digest)
-- interakcje Discord (Applied / Reject → update statusu)
-- in-memory store
+System realizuje zaawansowany pipeline AI zoptymalizowany pod kątem monitoringu i niezawodności:
+1.  **CV Embedding & Skill Extraction**: Profil kandydata jest wektoryzowany (Cohere) i analizowany pod kątem kluczowych technologii (LLM).
+2.  **Smart Ingestion**: Pobieranie ofert z wielu źródeł (**Jooble API**, **Jobicy API**, **Remotive API**, **RSS Aggregator**) z filtrowaniem lokalizacji (**LocationGuard**).
+3.  **Single Embedding Pattern**: Każda unikalna oferta jest wektoryzowana tylko raz dla celów deduplikacji i dopasowania.
+4.  **Vector Deduplication (pgvector)**: Sprawdzanie duplikacji w PostgreSQL **PRZED** kosztowną analizą LLM.
+5.  **Multi-Level AI Scoring & Fallback**: Głęboka analiza LLM z kaskadowym systemem odporności na awarie (**Groq -> OpenAI -> Gemini -> Semantic Fallback**) i alertami na Discordzie.
+6.  **Full Monitoring Console**: Powiadomienia Discord o każdym etapie (Start/Finish Ingestion), błędach providerów i wyczerpaniu limitów AI.
+7.  **Dynamic Control Panel**: Zarządzanie progami i konfiguracją prosto z Discorda.
 
 ---
 
 ## 🛠 Stack technologiczny
 
-- **Backend:** Java 21, Spring Boot 4.0.5
-- **Architektura:** Modular Monolith / Event-Driven ready
-- **Messaging (kolejne etapy):** Apache Kafka (KRaft)
-- **Baza danych:** PostgreSQL + pgvector (docelowo)
-- **AI:** Spring AI 2.0.0-M4
-  * ChatClient – scoring / analiza
-  * EmbeddingModel – embedding CV + ofert (Etap 2)  
-- **Operacje:** Docker + QNAP NAS + Cloudflare Tunnel
-- **Kanał użytkownika:** Discord (instant alerts + digest + interakcje)
+- **Backend:** Java 21, **Spring Boot 4.0.5**
+- **Architektura:** Modern Clean Code (Lombok, MapStruct, **Spring AI 2.0.0-M4**)
+- **Baza danych:** PostgreSQL 15 + **pgvector** (HNSW index)
+- **AI Models:**
+  - **Embedding:** Cohere Multilingual v3 (1024d) - Primary / OpenAI text-embedding-3-small - Fallback
+  - **Scoring:** Groq Llama 3.3 70b (Primary) / OpenAI GPT-4o-mini / **Google Gemini 2.5 Flash Lite**
+- **Operacje:** Docker + GitHub Actions (CI/CD)
+- **Kanał użytkownika:** Discord (Instant alerts + Daily Digest + Interaction Buttons + System Status Alerts)
 
 ---
 
-## 🧠 Logika MVP (ustalona)
+## 🧠 Logika Procesu (Flow)
 
-### Harmonogram
-- Ingestion: **co 2 godziny (24/7)**
-- Daily Digest: **18:00 Europe/Warsaw**
+```plain
+CV → Parsing (Apache Tika) → AI Skill Extraction → Embedding (Cohere) → Profile Vector (Cache)
 
-### Źródła (MVP)
-- Jooble
-  - zaplanowane API - Adzuna API, Arbeitnow API, USAJOBS API, Greenhouse job boards, Lever jobs API
-  - zaplanowane RSS - Jobicy RSS, Remote OK RSS, We Work Remotely RSS, Remotive RSS
+Offer →
+  Ingestion (Jooble / Jobicy / Remotive / RSS) →
+  LOCATION GUARD (Dynamic Filter) →
+  TECH STACK EXTRACTION →
+  SINGLE EMBEDDING (Cohere/OpenAI Fallback) →
+  VECTOR DEDUPLICATION (pgvector Search) →
+  IF Duplicate THEN: Skip
+  IF Unique THEN:
+    SAVE TO VECTOR STORE →
+    SEMANTIC MATCHING (Cosine Similarity) →
+    IF Score > dynamic_threshold THEN:
+      AI MULTI-MODEL SCORING (Groq -> OpenAI -> Gemini) →
+      (Alert Discord on Model Fallback/Limits)
+    PRIORITY BOOSTING →
+    Discord Notification (Instant/Digest/Alerts)
+```
 
-### Progi dopasowania
-- `score >= 90` → Discord **Instant**
+### Progi dopasowania (Dynamiczne)
+- `score >= 90` → Discord **Instant Alert**
 - `60 <= score < 90` → Discord **Daily Digest**
-- `40 <= score < 60` → zapis tylko do DB/store
-- `< 40` → status `ARCHIVED`
-
-### Reguły jakości
-- Twarde `must-have` (na MVP z configu, docelowo AI z dokumentów)
-- Filtrowanie lokalizacji: Łódź / hybryda PL / remote
-- Deduplikacja hybrydowa:
-  1. `sourceUrl` (unikalność techniczna)
-  2. `fingerprint = SHA-256(normalized(title + company + city))`
+- `40 <= score < 60` → Baza danych (Tracking)
+- `< 40` → Status `ARCHIVED`
 
 ---
 
-## 📁 Profil kandydata (MVP)
+## 🏗 Struktura Projektu
 
-- Katalog wejściowy: **`/data/workdone/profile-input`**
-- CV / LinkedIn / certyfikaty jako input kontekstowy
-- Pliki tekstowe (`txt`, `md`, `json`) są czytane bezpośrednio
-- OCR dla PDF/obrazów: OCR_PENDING (kolejny etap)
-
----
-
-## 🏗 Moduły backendu (obecnie)
-
-1. **Ingestion** – lejek ofert (`JobProvider` + fetchery)
-2. **Analysis**
-	* OfferClassificationService
-	* OfferMatchingService
-	* OfferFingerprintFactory
-	* OfferScoringService
-	* OfferEmbeddingService (przygotowane pod Etap 2)
-3. **Orchestration** – job scheduler i pipeline end-to-end
-4. **Storage** – store MVP + deduplikacja
-5. **Notification** – Discord instant/digest
-6. **Interaction** – `DiscordInteractionController` (`Applied` / `Reject` → update statusu)
-7. **Profile** – budowanie kontekstu kandydata z katalogu wejściowego  
-8. **Spring AI Integration** – `OfferScoringService` (ChatClient) oraz `OfferEmbeddingService` (EmbeddingModel) gotowe do podpięcia w pipeline ingestion/analysis
-
-## 🤖 AI (obecny stan)
-- Etap 0: scoring heurystyczny + must-have config
-- przygotowana integracja Spring AI:
-  - ChatClient (scoring logic – przyszłe rozszerzenie)
-  - EmbeddingModel (CV + offers embeddings)
+1.  **Ingestion** – Pobieranie danych: `RemotiveJobProvider` (API), `JobicyJobProvider` (API), `JoobleJobProvider` (API), `RssJobProvider` (RSS).
+2.  **Analysis** – Silnik oceny: `LocationGuard`, `OfferScoringService` (Multi-model), `DynamicConfigService`.
+3.  **Notification** – `DiscordNotifier` z obsługą alertów systemowych i interaktywnych paneli.
+4.  **Storage** – `PersistentOfferStore` (JPA) + `OfferVectorStore` (pgvector).
 
 ---
 
-## ▶️ Konfiguracja `application.yaml`
+## 📁 Źródła Danych (Zasoby)
 
-- `workdone.profile.input-directory`
-- `workdone.matching.*`
-- `workdone.scheduling.*`
-- `workdone.discord.instant.*`
-- `workdone.discord.digest.*`
-- `workdone.providers.*`
+### Obecne (API):
+- **Jooble API**
+- **Jobicy API**
+- **Remotive API** (Zmigrowane z RSS)
+
+### Obecne (RSS):
+- **RemoteOK**
+- **WeWorkRemotely**
 
 ---
 
-## 🗺 Roadmapa po MVP
-### 🔥 Etap 0 - zakończony
-**Cel: system działa i już daje przewagę**
-### 🟡 Etap 1 – Smart Filtering
-- lepszy junior detection
-- location intelligence
-- tuning progów scoringu
-### 🟠 Etap 2 – Embedding Matching 
-- CV embedding (pgvector ready)
-- offer embedding storage
-- semantic similarity scoring
-- hybrid scoring (keyword + embedding)
-### 🔴 Etap 3 – Learning System
-- feedback loop (Applied / Rejected)
-- dynamic weighting
-- similarity learning
-### 🔵 Etap 4 – Discord Control Panel
-- sterowanie filtrami przez Discord
-- runtime preferences
-### 🟣 Etap 5 – Opportunity Discovery
-- low-match high-potential detection
-- "Growth Opportunity" pipeline
+## ▶️ Konfiguracja
+
+### Zmienne Środowiskowe:
+- `COHERE_API_KEY`: Embedding 1024d.
+- `GROQ_API_KEY`: Primary scoring.
+- `OPENAI_API_KEY`: Fallback scoring/embedding.
+- `GEMINI_API_KEY`: Tertiary scoring.
+- `DISCORD_PUBLIC_KEY`: Weryfikacja interakcji.
+- `DB_HOST`, `DB_NAME`, `DB_USERNAME`, `DB_PASSWORD`: PostgreSQL + pgvector.
+
+---
+
+## 🗺 Roadmapa
+- [ ] **Automatyczna Nauka**: Dynamiczne wagowanie na podstawie decyzji Applied/Reject.
+- [ ] **OCR Support**: Obsługa CV w formie obrazów.
+- [ ] **Growth Opportunity**: Wykrywanie ofert "prawie pasujących".

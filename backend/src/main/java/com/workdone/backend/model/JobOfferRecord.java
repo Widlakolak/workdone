@@ -1,122 +1,36 @@
 package com.workdone.backend.model;
 
+import lombok.Builder;
+import lombok.With;
 import java.time.LocalDateTime;
 import java.util.List;
 
+/**
+ * Mój główny rekord reprezentujący ofertę pracy w całym systemie. 
+ * Niezmienny (Immutable), z builderem i metodami @With do łatwej aktualizacji.
+ */
+@With
+@Builder(toBuilder = true)
 public record JobOfferRecord(
         String id,
-        String fingerprint,
+        String fingerprint,   // Unikalny skrót treści (tytuł+firma), żeby wyłapać te same oferty z różnych stron
         String title,
         String companyName,
-        String sourceUrl,
+        String sourceUrl,     // Adres do ogłoszenia (wymagany)
         String location,
         String rawDescription,
         String salaryRange,
         List<String> techStack,
-        Double matchingScore,
-        Double priorityScore,
-        OfferStatus status,
+        Double matchingScore, // Wynik dopasowania do mojego CV (0-100)
+        Double priorityScore, // Finalny priorytet po uwzględnieniu boostów
+        OfferStatus status,   // Status (NEW, ANALYZED, APPLIED, itp.)
         LocalDateTime publishedAt,
-        String sourcePlatform
+        String sourcePlatform // Skąd pobrano (np. JOOBLE, JOBICY)
 ) {
     public JobOfferRecord {
+        // sourceUrl to jedyne pole, bez którego system nie będzie działał (nie da się sprawdzić szczegółów ani zaaplikować)
         if (sourceUrl == null || sourceUrl.isBlank()) {
             throw new IllegalArgumentException("Oferta musi posiadać unikalny adres URL (sourceUrl)");
         }
-    }
-
-    public JobOfferRecord withAnalysis(Double newScore, OfferStatus newStatus) {
-        return new JobOfferRecord(
-                id,
-                fingerprint,
-                title,
-                companyName,
-                sourceUrl,
-                location,
-                rawDescription,
-                salaryRange,
-                techStack,
-                newScore,
-                priorityScore,
-                newStatus,
-                publishedAt,
-                sourcePlatform
-        );
-    }
-
-    public JobOfferRecord withMatchingScore(Double newScore) {
-        return new JobOfferRecord(
-                this.id(),
-                this.fingerprint(),
-                this.title(),
-                this.companyName(),
-                this.sourceUrl(),
-                this.location(),
-                this.rawDescription(),
-                this.salaryRange(),
-                this.techStack(),
-                newScore,
-                this.priorityScore,
-                this.status(),
-                this.publishedAt(),
-                this.sourcePlatform()
-        );
-    }
-
-    public JobOfferRecord withPriorityScore(Double newPriorityScore) {
-        return new JobOfferRecord(
-                this.id(),
-                this.fingerprint(),
-                this.title(),
-                this.companyName(),
-                this.sourceUrl(),
-                this.location(),
-                this.rawDescription(),
-                this.salaryRange(),
-                this.techStack(),
-                this.matchingScore(),
-                newPriorityScore,
-                this.status(),
-                this.publishedAt(),
-                this.sourcePlatform()
-        );
-    }
-
-    public JobOfferRecord withStatus(OfferStatus newStatus) {
-        return new JobOfferRecord(
-                this.id(),
-                this.fingerprint(),
-                this.title(),
-                this.companyName(),
-                this.sourceUrl(),
-                this.location(),
-                this.rawDescription(),
-                this.salaryRange(),
-                this.techStack(),
-                this.matchingScore(),
-                this.priorityScore(),
-                newStatus,
-                this.publishedAt(),
-                this.sourcePlatform()
-        );
-    }
-
-    public JobOfferRecord withIdAndFingerprint(String newId, String newFingerprint) {
-        return new JobOfferRecord(
-                newId,
-                newFingerprint,
-                this.title(),
-                this.companyName(),
-                this.sourceUrl(),
-                this.location(),
-                this.rawDescription(),
-                this.salaryRange(),
-                this.techStack(),
-                this.matchingScore(),
-                this.priorityScore(),
-                this.status(),
-                this.publishedAt(),
-                this.sourcePlatform()
-        );
     }
 }

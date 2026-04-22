@@ -19,7 +19,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 256M # Zmniejszone, by nie dusić NAS-a
+          memory: 256M
     volumes:
       - /share/CACHEDEV1_DATA/Container/workdone/postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -58,14 +58,23 @@ services:
       postgres-workdone:
         condition: service_healthy
     environment:
+      # AI API KEYS
       SPRING_AI_GOOGLE_GENAI_API_KEY: ${GEMINI_API_KEY}
       SPRING_AI_OPENAI_API_KEY: ${OPENAI_API_KEY}
-      SPRING_AI_MODEL_EMBEDDING_PROVIDER: openai
+      SPRING_AI_GROQ_API_KEY: ${GROQ_API_KEY}
+      SPRING_AI_COHERE_API_KEY: ${COHERE_API_KEY}
+      
+      # DISCORD SECURITY
+      DISCORD_PUBLIC_KEY: ${DISCORD_PUBLIC_KEY}
+
+      # DATABASE
       DB_HOST: postgres-workdone
       DB_PORT: 5432
       DB_NAME: workdonesql
       DB_USERNAME: devuser
       DB_PASSWORD: devpassword
+      
+      # INFRA
       KAFKA_BOOTSTRAP_SERVERS: kafka-workdone:9092
     volumes:
       - /share/CACHEDEV1_DATA/Container/workdone/profile-input:/data/workdone/profile-input
@@ -86,8 +95,6 @@ services:
     command: tunnel --no-autoupdate run --protocol http2
     environment:
       TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN}
-#    depends_on:
- #     - nginx
     networks:
       - shared-net
 

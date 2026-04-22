@@ -14,6 +14,10 @@ import java.time.Instant;
 
 import static java.nio.file.StandardWatchEventKinds.*;
 
+/**
+ * Strażnik folderu z CV. Jak tylko wrzucę tam nowy plik PDF, 
+ * ten serwis to wyłapie i odpali proces parsowania.
+ */
 @Component
 public class CvDirectoryWatcher {
 
@@ -30,6 +34,7 @@ public class CvDirectoryWatcher {
 
     @PostConstruct
     public void start() {
+        // Odpalam pętlę nasłuchującą w wirtualnym wątku, żeby nie blokować startu aplikacji
         Thread.ofVirtual().start(this::watchLoop);
     }
 
@@ -45,6 +50,7 @@ public class CvDirectoryWatcher {
             log.info("CV Watcher started for: {}", folder);
 
             while (true) {
+                // Czekam na zdarzenie pojawienia się pliku
                 WatchKey key = watchService.take();
 
                 for (WatchEvent<?> event : key.pollEvents()) {
@@ -55,8 +61,9 @@ public class CvDirectoryWatcher {
                     Instant detectedAt = Instant.now();
                     Instant modifiedAt = Instant.ofEpochMilli(fullPath.toFile().lastModified());
 
-                    log.info("New CV file detected: {}", fullPath);
+                    log.info("Wykryto nowe CV: {}", fullPath);
 
+                    // Rozsyłam info w świat (do Spring Eventów), że jest robota do zrobienia
                     publisher.publishEvent(
                             new CvFileDetectedEvent(fullPath, detectedAt, modifiedAt)
                     );
@@ -66,7 +73,7 @@ public class CvDirectoryWatcher {
             }
 
         } catch (IOException | InterruptedException e) {
-            log.error("CV watcher crashed", e);
+            log.error("CV watcher padł - sprawdzić dlaczego!", e);
         }
     }
 }

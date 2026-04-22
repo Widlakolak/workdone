@@ -1,0 +1,28 @@
+workdone:
+  profile:
+    input-directory: D:/dev/workdone/profile-input
+  discord:
+    instant:
+      enabled: true
+      url: "https://discord.com/api/webhooks/dummy"
+  search:
+    default-location: "Poland"
+    allow-remote: true
+  providers:
+    jooble:
+      enabled: true
+      url: "https://jooble.org/api"
+      api-key: "dummy-key"
+    jobicy:
+      enabled: true
+      url: "https://jobicy.com/api/v2/remote-jobs"
+  matching:
+    semantic-threshold: 0.7
+    instant-threshold: 0.8
+    digest-threshold: 0.6
+    archive-threshold: 0.4
+    must-have-keywords: ["java", "spring"]
+  scheduling:
+    ingestion-cron: "0 0 * * * *"
+    digest-cron: "0 0 9 * * *"
+    zone-id: "Europe/Warsaw"

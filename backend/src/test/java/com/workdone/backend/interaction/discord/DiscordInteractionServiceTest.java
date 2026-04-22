@@ -1,9 +1,13 @@
 package com.workdone.backend.interaction.discord;
 
+import com.workdone.backend.orchestration.OfferIngestionOrchestrator;
+import com.workdone.backend.profile.service.CandidateProfileService;
+import com.workdone.backend.analysis.DynamicConfigService;
 import com.workdone.backend.model.JobOfferRecord;
 import com.workdone.backend.model.OfferStatus;
 import com.workdone.backend.storage.InMemoryOfferStore;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -15,28 +19,35 @@ class DiscordInteractionServiceTest {
     @Test
     void shouldUpdateOfferStatusWhenCustomIdIsValid() {
         InMemoryOfferStore store = new InMemoryOfferStore();
-        store.upsert(new JobOfferRecord(
-                "id-1",
-                "fp-1",
-                "Java Developer",
-                "ACME",
-                "https://example.com/job/1",
-                "Łódź",
-                "desc",
-                "",
-                List.of("Java"),
-                95.0,
-                95.0,
-                OfferStatus.ANALYZED,
-                LocalDateTime.now(),
-                "JUST_JOIN_IT"
-        ));
+        DynamicConfigService dynamicConfig = Mockito.mock(DynamicConfigService.class);
+        CandidateProfileService profileService = Mockito.mock(CandidateProfileService.class);
+        OfferIngestionOrchestrator orchestrator = Mockito.mock(OfferIngestionOrchestrator.class);
+        
+        String targetUrl = "https://example.com/job/1";
+        
+        store.upsert(JobOfferRecord.builder()
+                .id("id-1")
+                .fingerprint("fp-1")
+                .title("Java Developer")
+                .companyName("ACME")
+                .sourceUrl(targetUrl)
+                .location("Łódź")
+                .rawDescription("desc")
+                .techStack(List.of("Java"))
+                .matchingScore(95.0)
+                .priorityScore(95.0)
+                .status(OfferStatus.ANALYZED)
+                .publishedAt(LocalDateTime.now())
+                .sourcePlatform("JUST_JOIN_IT")
+                .build());
 
-        DiscordInteractionService service = new DiscordInteractionService(store);
-        String result = service.handleCustomId("applied|https://example.com/job/1");
+        DiscordInteractionService service = new DiscordInteractionService(store, dynamicConfig, profileService, orchestrator);
+        String result = service.handleCustomId("applied|" + targetUrl);
 
-        assertThat(result).contains("APPLIED");
-        JobOfferRecord updated = store.findByUrls(List.of("https://example.com/job/1")).getFirst();
+        // Poprawiłem asercję, żeby pasowała do faktycznego komunikatu z serwisu
+        assertThat(result).contains("✅ Zapisałem wybór: applied.");
+        
+        JobOfferRecord updated = store.findBySourceUrl(targetUrl).orElseThrow();
         assertThat(updated.status()).isEqualTo(OfferStatus.APPLIED);
     }
 }

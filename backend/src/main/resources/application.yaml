@@ -1,6 +1,9 @@
 spring:
   application:
     name: backend
+  
+  main:
+    allow-bean-definition-overriding: true
 
   datasource:
     url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:workdonesql}
@@ -15,7 +18,7 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: validate
+      ddl-auto: none
     show-sql: false
     properties:
       hibernate:
@@ -24,25 +27,26 @@ spring:
         dialect: org.hibernate.dialect.PostgreSQLDialect
 
   ai:
+    openai:
+      api-key: ${OPENAI_API_KEY}
+      chat: { options: { model: gpt-4o-mini } }
     google:
       genai:
-        api-key: ${GEMINI_API_KEY:}
-        chat:
-          options:
-            model: gemini-2.5-flash-lite
-    openai:
-      api-key: ${OPENAI_API_KEY:}
-    model:
-      chat: google-genai
-      embedding:
-        enabled: true
-        provider: openai
+        api-key: ${GEMINI_API_KEY}
+        chat: { options: { model: gemini-2.5-flash-lite } }
+    groq:
+      api-key: ${GROQ_API_KEY}
+      base-url: https://api.groq.com/openai
+      model: llama-3.3-70b-versatile
+    cohere:
+      api-key: ${COHERE_API_KEY}
+
     vectorstore:
       pgvector:
         initialize-schema: true
         index-type: HNSW
         distance-type: COSINE_DISTANCE
-        dimensions: 768
+        dimensions: 1024
 
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka-workdone:9092}
@@ -53,75 +57,51 @@ spring:
 workdone:
   profile:
     input-directory: /data/workdone/profile-input
-
   matching:
     ai-threshold-min: 50.0
     ai-threshold-max: 85.0
     instant-threshold: 90.0
     digest-threshold: 60.0
     archive-threshold: 40.0
-    must-have-keywords:
-      - java
-      - spring boot
-      - sql
-
+    semantic-threshold: 70.0
+    must-have-keywords: [ "java", "spring boot", "sql" ]
   scheduling:
     ingestion-cron: "0 0 */2 * * *"
     digest-cron: "0 0 18 * * *"
     zone-id: Europe/Warsaw
-
   discord:
-    instant:
-      enabled: false
-      url:
-    digest:
-      enabled: false
-      url:
-
+    public-key: ${DISCORD_PUBLIC_KEY}
+    instant: { enabled: false, url: "" }
+    digest: { enabled: false, url: "" }
   providers:
-    justjoinit:
+    rss:
       enabled: true
-      base-url: https://api.justjoin.it
-      offers-path: /v2/user-panel/offers
-      priority: HIGH
-      filters:
-        keywords: [ java, spring ]
-        allowed-cities: [ lodz ]
-        allow-remote: true
-        allow-hybrid: true
-
-    nofluffjobs:
+      sources:
+        - name: "RemoteOK"
+          # Dynamiczne: w kodzie trzeba będzie podmieniać 'java' na skill z CV
+          url: "https://remoteok.com/remote-java-jobs.rss" 
+        - name: "WeWorkRemotely"
+          url: "https://weworkremotely.com/categories/remote-back-end-programming-jobs.rss"
+    remotive:
       enabled: true
-      priority: HIGH
-      filters:
-        keywords: [ java, spring-boot ]
-        experience-levels: [ junior, mid ]
-        allow-remote: true
-        allow-hybrid: true
-
-    theprotocol:
-      enabled: true
-      priority: MEDIUM
-      filters:
-        allowed-cities: [ lodz ]
-        work-modes: [ hybrid, remote ]
-
-    upwork:
-      enabled: true
-      priority: EXPERIMENTAL
-      filters:
-        query: "java spring rest"
-        min-budget-usd: 200
-        remote-only: true
-
+      base-url: "https://remotive.com/api"
     jooble:
       enabled: true
       priority: HIGH
       api-key: ${JOOBLE_API_KEY}
       base-url: https://jooble.org/api
       filters:
-        keywords: [ "java", "rest", "spring boot" ]
+        # To będzie nadpisywane przez MatchingService na podstawie CV
+        keywords: "java, spring boot, sql" 
         location: "Łódź"
         radius: "50"
-        # salary: 8000
         allow-remote: true
+    jobicy:
+      enabled: true
+      priority: MEDIUM
+      base-url: "https://jobicy.com/api/v2/remote-jobs"
+      filters:
+        count: 50
+        geo: "" # Wyciągane z profilu (np. poland, usa)
+        industry: "engineering" 
+        tag: "java, spring boot" # Główne skille z CV

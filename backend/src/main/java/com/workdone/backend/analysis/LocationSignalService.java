@@ -1,48 +1,42 @@
 package com.workdone.backend.analysis;
 
 import com.workdone.backend.model.JobOfferRecord;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.Locale;
 
+/**
+ * Serwis sygnałów lokalizacji. Teraz korzysta z LocationGuard jako źródła prawdy.
+ * Tu sprawdzam czy to nie duplikat logiki, żeby nie było bajzlu.
+ */
+@Slf4j
 @Service
+@RequiredArgsConstructor
 public class LocationSignalService {
 
+    private final LocationGuard locationGuard;
+
     public boolean isRemote(JobOfferRecord offer) {
-        String text = buildText(offer);
-        return text.contains("remote");
+        return locationGuard.isRemote(offer);
     }
 
     public boolean isHybrid(JobOfferRecord offer) {
-        String text = buildText(offer);
-        return text.contains("hybrid");
+        return locationGuard.isHybrid(offer);
     }
 
     public boolean isPoland(JobOfferRecord offer) {
-        String text = buildText(offer);
+        String text = (offer.location() + " " + offer.rawDescription()).toLowerCase(Locale.ROOT);
         return text.contains("poland") || text.contains("polska");
     }
 
-    private String buildText(JobOfferRecord offer) {
-        return (offer.location() + " " + offer.rawDescription())
-                .toLowerCase(Locale.ROOT);
-    }
-
     public boolean isRemoteFromLocation(JobOfferRecord offer) {
-        return offer.location().toLowerCase().contains("remote");
+        return offer.location().toLowerCase(Locale.ROOT).contains("remote");
     }
 
     public boolean isAllowedLocation(JobOfferRecord offer) {
-        String loc = offer.location().toLowerCase();
-
-        if (loc.contains("remote") || loc.contains("europe") || loc.contains("world")) {
-            return true;
-        }
-
-        if (loc.contains("poland") || loc.contains("polska")) {
-            return true;
-        }
-
-        return isRemote(offer) || isHybrid(offer);
+        // Korzystam z głównej logiki akceptacji
+        return locationGuard.isAccepted(offer);
     }
 }

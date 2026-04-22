@@ -4,9 +4,17 @@ import com.workdone.backend.model.JobOfferRecord;
 import org.springframework.stereotype.Component;
 import java.util.List;
 
+/**
+ * Fabryka tekstu. Formatuje surowe dane o ofertach na ładne wiadomości, 
+ * które potem lądują na moim Discordzie.
+ */
 @Component
 public class OfferContentBuilder {
 
+    /**
+     * Buduje skróconą, "techniczną" treść oferty do porównania wektorowego. 
+     * Skupiam się na kluczowych polach: tytuł, firma, miejsce i opis.
+     */
     public String buildTechnicalContent(JobOfferRecord offer) {
         return String.format("%s %s %s %s",
                 offer.title(),
@@ -16,13 +24,16 @@ public class OfferContentBuilder {
         );
     }
 
+    /**
+     * Przygotowuje treść wiadomości dla ofert, które wymagają mojej natychmiastowej uwagi.
+     */
     public String buildInstantMessage(JobOfferRecord offer) {
         return """
-               🔥 **Instant Match >=90%%**
-               %s @ %s
-               Match: %s%%
-               Priority: %s%%
-               %s
+               🔥 **NOWA DOBRA OFERTA!**
+               **%s** @ **%s**
+               Dopasowanie: %s%%
+               Priorytet: %s%%
+               Link: %s
                """.formatted(
                 offer.title(),
                 offer.companyName(),
@@ -32,13 +43,17 @@ public class OfferContentBuilder {
         ).trim();
     }
 
+    /**
+     * Składa listę "całkiem niezłych" ofert w jedno zbiorcze podsumowanie. 
+     * Sortuję je od najwyższego priorytetu i ograniczam do 20 sztuk, żeby nie robić spamu.
+     */
     public String buildDigestMessage(List<JobOfferRecord> offers) {
-        StringBuilder message = new StringBuilder("📋 **Daily Digest (>=60%)**\n");
+        StringBuilder message = new StringBuilder("📋 **ZBIORCZY RAPORT DZIENNY**\n");
         offers.stream()
                 .sorted((a, b) -> Double.compare(safeValue(b.priorityScore()), safeValue(a.priorityScore())))
                 .limit(20)
                 .forEach(offer -> message.append(String.format(
-                        " [M:%d%% | P:%d%%]\n- %s @ %s\n%s\n",
+                        " [Match: %d%% | Prio: %d%%]\n- %s @ %s\n<%s>\n",
                         Math.round(safeValue(offer.matchingScore())),
                         Math.round(safeValue(offer.priorityScore())),
                         offer.title(),

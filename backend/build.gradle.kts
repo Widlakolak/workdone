@@ -30,6 +30,7 @@ dependencies {
     // === AI & WEKTORY ===
     implementation("org.springframework.ai:spring-ai-starter-model-openai")
     implementation("org.springframework.ai:spring-ai-starter-model-google-genai")
+    implementation("com.cohere:cohere-java:1.10.1")
     implementation("org.springframework.ai:spring-ai-starter-vector-store-pgvector")
     implementation("org.springframework.ai:spring-ai-tika-document-reader")
     implementation("org.springframework.boot:spring-boot-starter-jdbc")
@@ -45,6 +46,12 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.boot:spring-boot-starter-data-jdbc")
+
+    // === RSS PARSING ===
+    implementation("com.rometools:rome:2.1.0")
+
+    // === SECURITY (Discord Interactions) ===
+    implementation("com.google.crypto.tink:tink:1.13.0")
 
     // === SYSTEMY ROZPROSZONE ===
     implementation("org.springframework.kafka:spring-kafka")
