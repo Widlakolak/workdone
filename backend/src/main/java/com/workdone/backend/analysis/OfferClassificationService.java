@@ -11,20 +11,18 @@ public class OfferClassificationService {
     private final DynamicConfigService dynamicConfig;
 
     public MatchingBand classify(double score) {
-        // Przypisuję ofertę do "kubełka" na podstawie punktacji. 
-        // Progi mogę zmieniać w locie przez bota, więc pobieram je z DynamicConfigService.
-        if (score >= dynamicConfig.getInstantThreshold()) return MatchingBand.INSTANT; // Najlepsze, powiadomienie od razu
-        if (score >= dynamicConfig.getDigestThreshold()) return MatchingBand.DIGEST;   // Dobre, trafią do raportu dziennego
-        if (score >= dynamicConfig.getArchiveThreshold()) return MatchingBand.TRACKING; // Słabe, ale zostawiam w bazie do śledzenia
-        return MatchingBand.ARCHIVED; // Odpady, chowam do archiwum
+        if (score >= dynamicConfig.getInstantThreshold()) return MatchingBand.INSTANT;
+        if (score >= dynamicConfig.getDigestThreshold()) return MatchingBand.DIGEST;
+        if (score >= dynamicConfig.getArchiveThreshold()) return MatchingBand.TRACKING;
+        return MatchingBand.ARCHIVED;
     }
 
     public OfferStatus toStatus(MatchingBand band) {
         return switch (band) {
-            case INSTANT -> OfferStatus.NEW;
-            case DIGEST -> OfferStatus.NEW;
-            case TRACKING -> OfferStatus.ANALYZED;
-            case ARCHIVED -> OfferStatus.ARCHIVED;
+            case INSTANT -> OfferStatus.ANALYZED; // Natychmiast wysłane, czekają na decyzję
+            case DIGEST -> OfferStatus.ANALYZED;   // Wysłane w podsumowaniu, czekają na decyzję
+            case TRACKING -> OfferStatus.ANALYZED; // Śledzone, czekają na decyzję
+            case ARCHIVED -> OfferStatus.ARCHIVED; // Odrzucone przez system
         };
     }
 }

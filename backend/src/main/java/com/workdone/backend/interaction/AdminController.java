@@ -1,6 +1,7 @@
 package com.workdone.backend.interaction;
 
 import com.workdone.backend.profile.service.CandidateProfileService;
+import com.workdone.backend.notification.DiscordNotifier;
 import com.workdone.backend.orchestration.OfferIngestionOrchestrator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,15 +17,15 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/admin/test")
 @RequiredArgsConstructor
-public class AdminTestController {
+public class AdminController {
 
     private final OfferIngestionOrchestrator orchestrator;
     private final CandidateProfileService profileService;
+    private final DiscordNotifier discordNotifier;
 
     @PostMapping("/run-ingestion")
     public String runIngestion() {
         log.info("🛠 Odpalam pobieranie ofert ręcznie z API.");
-        // Puszczam to w tle (virtual thread), żeby nie blokować mojego requesta (nie chcę timeoutu)
         Thread.ofVirtual().start(orchestrator::runIngestion);
         return "🚀 Maszyna ruszyła! Zaglądaj w logi.";
     }
@@ -35,4 +36,12 @@ public class AdminTestController {
         profileService.refreshProfile();
         return "✅ Skille i seniority odświeżone! Teraz jestem: " + profileService.getSeniority();
     }
+
+    @PostMapping("/show-panel")
+    public String showPanel() {
+        log.info("🎮 Wysyłam Master Control Panel na Discorda.");
+        discordNotifier.sendControlPanel();
+        return "🎮 Panel wysłany na Discorda!";
+    }
+
 }

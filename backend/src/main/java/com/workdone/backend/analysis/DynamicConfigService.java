@@ -1,10 +1,10 @@
 package com.workdone.backend.analysis;
 
 import com.workdone.backend.config.WorkDoneProperties;
+import com.workdone.backend.model.LocationPolicy;
 import com.workdone.backend.profile.service.CandidateProfileService;
 import jakarta.annotation.PostConstruct;
 import lombok.Getter;
-import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Lazy;
@@ -12,7 +12,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -28,8 +28,9 @@ public class DynamicConfigService {
     private double digestThreshold;
     private double archiveThreshold;
     private List<String> mustHaveKeywords;
-    private String preferredLocation;
+    private List<LocationPolicy> locationPolicies = new ArrayList<>();
     private boolean allowRemoteSearch;
+    private String preferredSeniority;
 
     public DynamicConfigService(WorkDoneProperties properties, @Lazy CandidateProfileService profileService) {
         this.properties = properties;
@@ -38,32 +39,31 @@ public class DynamicConfigService {
 
     @PostConstruct
     public void init() {
-        // Ładujemy progi z propertiesów, żeby nie wbijać ich na sztywno
         this.semanticThreshold = properties.matching() != null ? properties.matching().semanticThreshold() : 0.7;
         this.instantThreshold = properties.matching() != null ? properties.matching().instantThreshold() : 0.8;
         this.digestThreshold = properties.matching() != null ? properties.matching().digestThreshold() : 0.6;
         this.archiveThreshold = properties.matching() != null ? properties.matching().archiveThreshold() : 0.4;
         this.mustHaveKeywords = new ArrayList<>(properties.matching() != null ? properties.matching().mustHaveKeywords() : List.of());
-        
-        // Gdzie szukamy ofert? Jak nic nie podam, to domyślnie Polska i Remote
-        if (properties.search() != null) {
-            this.preferredLocation = properties.search().defaultLocation();
-            this.allowRemoteSearch = properties.search().allowRemote();
-        } else {
-            this.preferredLocation = "Poland";
-            this.allowRemoteSearch = true;
-        }
+        this.preferredSeniority = "junior";
+        this.allowRemoteSearch = properties.search() == null || properties.search().allowRemote();
 
-        log.info("⚙️ Konfiguracja dynamiczna zainicjalizowana: Semantic={}%, Location={}, Remote={}", 
-                semanticThreshold, preferredLocation, allowRemoteSearch);
+        // Domyślna lokalizacja z propertiesów jako pierwsza polityka (akceptujemy wszystko)
+        String defaultLoc = properties.search() != null ? properties.search().defaultLocation() : "Poland";
+        this.locationPolicies.add(new LocationPolicy(defaultLoc, true, true, true, 5));
+
+        log.info("⚙️ Konfiguracja dynamiczna zainicjalizowana: Semantic={}%, Policies={}, Remote={}, Seniority={}", 
+                semanticThreshold, locationPolicies.size(), allowRemoteSearch, preferredSeniority);
     }
 
-    // Spinamy lokalizację z tym, co AI wygrzebało z mojego CV
     public void syncWithProfile() {
         String profileLocation = profileService.getLocation();
         if (profileLocation != null && !profileLocation.isBlank()) {
-            log.info("🔄 Synchronizacja lokalizacji z profilu CV: {}", profileLocation);
-            this.preferredLocation = profileLocation;
+            log.info("🔄 Synchronizacja danych z profilu CV: {}, {}", profileLocation, profileService.getSeniority());
+            // Jeśli profil ma nową lokalizację, dodajemy ją jako preferowaną (jeśli jeszcze nie ma)
+            if (locationPolicies.stream().noneMatch(p -> p.city().equalsIgnoreCase(profileLocation))) {
+                this.locationPolicies.add(new LocationPolicy(profileLocation, true, true, true, 5));
+            }
+            this.preferredSeniority = profileService.getSeniority();
         }
     }
 
@@ -75,28 +75,49 @@ public class DynamicConfigService {
                 case "digest": this.digestThreshold = Double.parseDouble(value); break;
                 case "archive": this.archiveThreshold = Double.parseDouble(value); break;
                 case "musthave": this.mustHaveKeywords = List.of(value.split(",")); break;
-                case "location": this.preferredLocation = value; break;
+                case "location": parseAndAddLocation(value); break;
                 case "remote": this.allowRemoteSearch = Boolean.parseBoolean(value); break;
+                case "seniority": this.preferredSeniority = value; break;
+                case "clear_locations": this.locationPolicies.clear(); break;
                 default: return "❌ Nieznany parametr: " + param;
             }
-            log.info("🔄 Parametr {} zaktualizowany dynamicznie na: {}", param, value);
-            return "✅ Parametr " + param + " ustawiony na: " + value;
+            log.info("🔄 Parametr {} zaktualizowany dynamicznie.", param);
+            return "✅ Parametr " + param + " zaktualizowany.";
         } catch (Exception e) {
             log.error("❌ Błąd aktualizacji parametru {}: {}", param, e.getMessage());
             return "❌ Błąd aktualizacji: " + e.getMessage();
         }
     }
 
+    private void parseAndAddLocation(String value) {
+        // Format: city:remote:hybrid:onsite:days (np. Lodz:true:true:true:2)
+        String[] parts = value.split(":");
+        if (parts.length >= 4) {
+            String city = parts[0];
+            boolean r = Boolean.parseBoolean(parts[1]);
+            boolean h = Boolean.parseBoolean(parts[2]);
+            boolean o = Boolean.parseBoolean(parts[3]);
+            Integer days = parts.length > 4 ? Integer.parseInt(parts[4]) : null;
+            
+            // Usuwamy starą politykę dla tego miasta, jeśli istnieje
+            locationPolicies.removeIf(p -> p.city().equalsIgnoreCase(city));
+            locationPolicies.add(new LocationPolicy(city, r, h, o, days));
+        }
+    }
+
     public String getCurrentStatus() {
+        String policies = locationPolicies.stream()
+                .map(p -> "- %s (R:%s, H:%s, O:%s, MaxDays:%s)".formatted(p.city(), p.allowRemote(), p.allowHybrid(), p.allowOnsite(), p.maxDaysInOffice()))
+                .collect(Collectors.joining("\n"));
+
         return """
                 ⚙️ **Aktualna Konfiguracja:**
-                - Semantic Threshold (AI Start): %s%%
-                - Instant Threshold (Alert): %s
-                - Digest Threshold (Daily): %s
-                - Archive Threshold (Min): %s
+                - Semantic Threshold: %s%%
                 - Must-Have Keywords: %s
-                - Preferred Location: %s
                 - Allow Remote Search: %s
-                """.formatted(semanticThreshold, instantThreshold, digestThreshold, archiveThreshold, mustHaveKeywords, preferredLocation, allowRemoteSearch);
+                - Preferred Seniority: %s
+                - Location Policies:
+                %s
+                """.formatted(semanticThreshold, mustHaveKeywords, allowRemoteSearch, preferredSeniority, policies);
     }
 }

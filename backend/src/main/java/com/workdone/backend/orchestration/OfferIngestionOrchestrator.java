@@ -5,7 +5,10 @@ import com.workdone.backend.analysis.OfferClassificationService;
 import com.workdone.backend.analysis.OfferEmbeddingService;
 import com.workdone.backend.config.WorkDoneProperties;
 import com.workdone.backend.ingestion.JobProvider;
+import com.workdone.backend.ingestion.JobSearchParametersProvider;
+import com.workdone.backend.ingestion.SearchContext;
 import com.workdone.backend.model.JobOfferRecord;
+import com.workdone.backend.model.OfferStatus;
 import com.workdone.backend.notification.DiscordNotifier;
 import com.workdone.backend.profile.service.CandidateProfileService;
 import com.workdone.backend.storage.OfferStore;
@@ -37,6 +40,7 @@ public class OfferIngestionOrchestrator {
     private final DiscordNotifier notifier;
     private final WorkDoneProperties properties;
     private final OfferEmbeddingService embeddingService;
+    private final JobSearchParametersProvider searchParametersProvider;
 
     private final AtomicBoolean isIngestionRunning = new AtomicBoolean(false);
 
@@ -59,60 +63,79 @@ public class OfferIngestionOrchestrator {
                 return;
             }
 
-            for (JobProvider provider : providers) {
-                try {
-                    log.info("🔍 --- Provider: {} ---", provider.sourceName());
-                    List<JobOfferRecord> rawOffers = provider.fetchOffers();
-                    totalFound += rawOffers.size();
+            List<SearchContext> contexts = searchParametersProvider.getContexts();
+            log.info("📊 Mamy {} kontekstów wyszukiwania do sprawdzenia.", contexts.size());
 
-                    List<JobOfferRecord> newOffers = rawOffers.stream()
-                            .map(offerEnricher::cleanAndEnrich)
-                            .collect(Collectors.toMap(JobOfferRecord::fingerprint, o -> o, (o1, o2) -> o1, LinkedHashMap::new))
-                            .values().stream()
-                            .filter(offer -> !store.existsBySourceOrFingerprint(offer))
-                            .toList();
-
-                    if (newOffers.isEmpty()) continue;
-
-                    log.info("📥 Przetwarzam {} nowych ofert z {} (Batch Embedding)...", newOffers.size(), provider.sourceName());
-                    
-                    // Batching embeddingów - to oszczędza RPM w Cohere!
-                    List<float[]> offerVectors = new ArrayList<>();
+            for (SearchContext context : contexts) {
+                log.info("📍 Szukamy ofert dla: {} (Remote: {})", context.location(), context.remoteOnly());
+                
+                for (JobProvider provider : providers) {
                     try {
-                        offerVectors = embeddingService.embedOffers(newOffers);
-                    } catch (Exception e) {
-                        log.error("❌ Błąd batch embeddingu dla {}: {}. Próbuję procesować pojedynczo.", provider.sourceName(), e.getMessage());
-                    }
+                        log.info("🔍 Provider: {} [Lokalizacja: {}]", provider.sourceName(), context.location());
+                        List<JobOfferRecord> rawOffers = provider.fetchOffers(context);
+                        totalFound += rawOffers.size();
 
-                    for (int i = 0; i < newOffers.size(); i++) {
-                        JobOfferRecord offer = newOffers.get(i);
-                        float[] vector = (offerVectors.size() > i) ? offerVectors.get(i) : null;
+                        List<JobOfferRecord> newOffers = rawOffers.stream()
+                                .map(offerEnricher::cleanAndEnrich)
+                                .collect(Collectors.toMap(JobOfferRecord::fingerprint, o -> o, (o1, o2) -> o1, LinkedHashMap::new))
+                                .values().stream()
+                                .filter(offer -> !store.existsBySourceOrFingerprint(offer))
+                                .toList();
+
+                        if (newOffers.isEmpty()) continue;
+
+                        log.info("📥 Przetwarzam {} nowych ofert z {}...", newOffers.size(), provider.sourceName());
                         
+                        List<float[]> offerVectors = new ArrayList<>();
                         try {
-                            offerProcessor.processOffer(offer, candidateVector, vector);
-                            totalNew++;
-                        } catch (ObjectOptimisticLockingFailureException e) {
-                            log.warn("🔄 Optymistyczna blokada dla: {}", offer.title());
+                            offerVectors = embeddingService.embedOffers(newOffers);
                         } catch (Exception e) {
-                            log.error("❌ Błąd przy procesowaniu {}: {}", offer.title(), e.getMessage());
+                            log.error("❌ Błąd batch embeddingu: {}. Procesuję bez wektorów.", e.getMessage());
                         }
+
+                        for (int i = 0; i < newOffers.size(); i++) {
+                            JobOfferRecord offer = newOffers.get(i);
+                            float[] vector = (offerVectors.size() > i) ? offerVectors.get(i) : null;
+                            
+                            try {
+                                offerProcessor.processOffer(offer, candidateVector, vector);
+                                totalNew++;
+                            } catch (ObjectOptimisticLockingFailureException e) {
+                                log.warn("🔄 Optymistyczna blokada dla: {}", offer.title());
+                            } catch (Exception e) {
+                                log.error("❌ Błąd przy procesowaniu {}: {}", offer.title(), e.getMessage());
+                            }
+                        }
+                    } catch (Exception e) {
+                        log.error("❌ Błąd dostawcy {} dla lokalizacji {}: {}", provider.sourceName(), context.location(), e.getMessage());
                     }
-                } catch (Exception e) {
-                    log.error("❌ Błąd dostawcy {}: {}", provider.sourceName(), e.getMessage());
                 }
             }
-            log.info("🏁 [INGESTION] Koniec. Znaleziono: {}, Przetworzono: {}", totalFound, totalNew);
+            log.info("🏁 [INGESTION] Koniec. Znaleziono łącznie: {}, Przetworzono nowych: {}", totalFound, totalNew);
         } finally {
             isIngestionRunning.set(false);
         }
     }
 
+    /**
+     * Wysyła codzienne podsumowanie ofert zaklasyfikowanych jako DIGEST, 
+     * które nadal czekają na Twoją decyzję.
+     */
     @Scheduled(cron = "${workdone.scheduling.digest-cron}", zone = "${workdone.scheduling.zone-id}")
     public void sendDailyDigest() {
         LocalDate today = LocalDate.now(ZoneId.of(properties.scheduling().zoneId()));
-        List<JobOfferRecord> digestOffers = store.findForDigest(today).stream()
+        
+        // Pobieramy oferty o statusie ANALYZED (czekające na decyzję)
+        List<JobOfferRecord> digestOffers = store.findByStatus(OfferStatus.ANALYZED).stream()
+                // Filtrujemy tylko te, które wpadają w pasmo DIGEST (czyli są "całkiem niezłe", ale nie "instant")
                 .filter(offer -> classificationService.classify(offer.priorityScore()) == MatchingBand.DIGEST)
                 .toList();
-        notifier.sendDigest(digestOffers);
+        
+        if (!digestOffers.isEmpty()) {
+            notifier.sendDigest(digestOffers);
+            log.info("📊 Wysłano digest z {} ofertami.", digestOffers.size());
+        } else {
+            log.info("📊 Brak nowych ofert do wysłania w digest.");
+        }
     }
 }

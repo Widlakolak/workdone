@@ -34,23 +34,19 @@ public class PersistentOfferStore implements OfferStore {
     @Override
     @Transactional
     public void upsert(JobOfferRecord offer) {
-        // Szukam oferty po URL albo fingerprint, żeby nie dodawać duplikatów
         Optional<JobOfferEntity> existingEntity = repository.findBySourceUrl(offer.sourceUrl())
                 .or(() -> repository.findByFingerprint(offer.fingerprint()));
 
         JobOfferEntity entity;
         if (existingEntity.isPresent()) {
             entity = existingEntity.get();
-            // Jak już jest, to aktualizuję tylko zmienne pola (mapper robi to za mnie)
             mapper.updateEntity(offer, entity);
             log.debug("🔄 Aktualizacja oferty: {}", entity.getTitle());
         } else {
-            // Jak nowa, to tworzę encję
             entity = mapper.toEntity(offer);
             log.debug("🆕 Zapis nowej oferty: {}", entity.getTitle());
         }
 
-        // Zapisuję i od razu flushuję, żeby mieć pewność, że dane są w bazie (ważne przy szybkich pętlach)
         repository.saveAndFlush(entity);
     }
 
@@ -81,5 +77,13 @@ public class PersistentOfferStore implements OfferStore {
     @Transactional(readOnly = true)
     public Optional<JobOfferRecord> findBySourceUrl(String sourceUrl) {
         return repository.findBySourceUrl(sourceUrl).map(mapper::toRecord);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<JobOfferRecord> findByStatus(OfferStatus status) {
+        return repository.findByStatus(status).stream()
+                .map(mapper::toRecord)
+                .toList();
     }
 }

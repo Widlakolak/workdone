@@ -3,6 +3,7 @@ package com.workdone.backend.interaction.discord;
 import com.workdone.backend.profile.service.CandidateProfileService;
 import com.workdone.backend.analysis.DynamicConfigService;
 import com.workdone.backend.model.OfferStatus;
+import com.workdone.backend.notification.DiscordNotifier;
 import com.workdone.backend.orchestration.OfferIngestionOrchestrator;
 import com.workdone.backend.storage.OfferStore;
 import lombok.RequiredArgsConstructor;
@@ -24,18 +25,28 @@ public class DiscordInteractionService {
     private final DynamicConfigService dynamicConfig;
     private final CandidateProfileService profileService;
     private final OfferIngestionOrchestrator orchestrator;
+    private final DiscordNotifier discordNotifier;
 
     public String handleCustomId(String customId) {
         log.info("📥 Obsługuję kliknięcie z Discorda: {}", customId);
 
-        // Obsługa mojego panelu sterowania (zaczyna się od 'config|')
         if (customId.startsWith("config|")) {
             String[] parts = customId.split("\\|");
             
-            // Proste akcje bez parametrów (np. config|status)
             if (parts.length == 2) {
                 switch (parts[1]) {
                     case "status" -> { return dynamicConfig.getCurrentStatus(); }
+                    case "help" -> { return getHelpMessage(); }
+                    case "pending" -> {
+                        var pendingOffers = store.findByStatus(OfferStatus.ANALYZED);
+                        if (pendingOffers.isEmpty()) return "✅ Brak ofert oczekujących na decyzję.";
+                        
+                        // Wysyłam je asynchronicznie, żeby nie blokować odpowiedzi do Discorda (timeout)
+                        Thread.ofVirtual().start(() -> {
+                            pendingOffers.forEach(discordNotifier::sendInstant);
+                        });
+                        return "📨 Wysyłam " + pendingOffers.size() + " ofert do decyzji...";
+                    }
                     case "refresh_cv" -> {
                         profileService.refreshProfile();
                         return "✅ CV przeanalizowane ponownie. Seniority: " + profileService.getSeniority();
@@ -53,13 +64,11 @@ public class DiscordInteractionService {
                 }
             }
             
-            // Akcje z wartością (np. config|semantic|80)
             if (parts.length == 3) {
                 return dynamicConfig.updateConfig(parts[1], parts[2]);
             }
         }
 
-        // Obsługa akcji na konkretnej ofercie (Applied / Reject)
         ParsedAction action = parse(customId);
         if (action == null) return "❌ Coś nie tak z tą akcją (błąd parsowania).";
 
@@ -71,13 +80,29 @@ public class DiscordInteractionService {
 
         if (newStatus == null) return "❌ Nie wiem, co mam zrobić z tą ofertą.";
 
-        // Aktualizuję status w bazie, żeby wiedzieć na co już aplikowałem
         boolean updated = store.updateStatusBySourceUrl(action.sourceUrl(), newStatus);
         return updated ? "✅ Zapisałem wybór: " + action.action() + "." : "❌ Nie znalazłem tej oferty w bazie (może stara?).";
     }
 
+    private String getHelpMessage() {
+        return """
+                💡 **Dostępne polecenia (przez API/Interakcje):**
+                
+                🛠 **Panel Sterowania:**
+                - `status` - aktualne filtry i miasta
+                - `pending` - wyślij oferty czekające na decyzję
+                - `refresh_cv` - ponowne AI skanowanie plików CV
+                - `run_ingestion` - natychmiastowe szukanie ofert
+                
+                ⚙️ **Konfiguracja (Parametry):**
+                - `semantic|0.x` - próg dopasowania AI
+                - `seniority|level` - junior/mid/senior
+                - `location|city:R:H:O:days` - dodaj miasto
+                - `clear_locations` - usuń wszystkie miasta
+                """;
+    }
+
     private ParsedAction parse(String customId) {
-        // customId ma format "akcja|url", np. "applied|https://job.com/123"
         String[] parts = customId.split("\\|", 2);
         return parts.length == 2 ? new ParsedAction(parts[0].toLowerCase(Locale.ROOT), parts[1]) : null;
     }

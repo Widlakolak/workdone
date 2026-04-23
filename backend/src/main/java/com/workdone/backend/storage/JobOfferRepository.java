@@ -1,5 +1,6 @@
 package com.workdone.backend.storage;
 
+import com.workdone.backend.model.OfferStatus;
 import com.workdone.backend.storage.entity.JobOfferEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
@@ -16,15 +17,14 @@ import java.util.UUID;
 @Repository
 public interface JobOfferRepository extends JpaRepository<JobOfferEntity, UUID> {
     
-    // Sprawdzam, czy oferta o takim URL-u albo treści już u mnie jest
     boolean existsBySourceUrlOrFingerprint(String sourceUrl, String fingerprint);
     
-    // Szukam po URL-u (np. przy aktualizacji statusu z Discorda)
     Optional<JobOfferEntity> findBySourceUrl(String sourceUrl);
     
-    // Wyciągam oferty z konkretnego przedziału czasu (przydatne do raportów dziennych)
     List<JobOfferEntity> findByPublishedAtBetween(LocalDateTime start, LocalDateTime end);
 
-    // Szukam po unikalnym "odcisku palca" treści
     Optional<JobOfferEntity> findByFingerprint(String fingerprint);
+
+    // Szukam ofert o konkretnym statusie
+    List<JobOfferEntity> findByStatus(OfferStatus status);
 }

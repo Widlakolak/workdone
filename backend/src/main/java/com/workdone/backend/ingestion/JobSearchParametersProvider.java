@@ -3,6 +3,7 @@ package com.workdone.backend.ingestion;
 import com.workdone.backend.analysis.DynamicConfigService;
 import com.workdone.backend.analysis.MustHaveGroup;
 import com.workdone.backend.analysis.MustHaveGroupConfig;
+import com.workdone.backend.model.LocationPolicy;
 import com.workdone.backend.profile.service.CandidateProfileService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,7 +24,7 @@ public class JobSearchParametersProvider {
     private final DynamicConfigService dynamicConfig;
     private final MustHaveGroupConfig mustHaveGroupConfig;
 
-    public SearchContext getContext() {
+    public List<SearchContext> getContexts() {
         // Składam listę słów kluczowych do wyszukiwarek ofert
         Set<String> keywords = new LinkedHashSet<>();
         
@@ -53,11 +54,56 @@ public class JobSearchParametersProvider {
             finalKeywords = List.of("java");
         }
 
-        return SearchContext.builder()
-                .keywords(finalKeywords)
-                .location(dynamicConfig.getPreferredLocation())
-                .remoteOnly(dynamicConfig.isAllowRemoteSearch())
-                .maxResults(100)
-                .build();
+        List<SearchContext> searchContexts = new ArrayList<>();
+        int maxResults = 100; // Domyślny limit wyników na jedno zapytanie
+
+        boolean globalRemotePolicyExists = false;
+
+        for (LocationPolicy policy : dynamicConfig.getLocationPolicies()) {
+            // Kontekst dla pracy zdalnej w ramach danej polityki
+            if (policy.allowRemote()) {
+                searchContexts.add(SearchContext.builder()
+                        .keywords(finalKeywords)
+                        .location(policy.city())
+                        .remoteOnly(true)
+                        .maxResults(maxResults)
+                        .build());
+                if (policy.city() == null || policy.city().equalsIgnoreCase("remote") || policy.city().equalsIgnoreCase("anywhere")) {
+                    globalRemotePolicyExists = true;
+                }
+            }
+            // Kontekst dla pracy hybrydowej/stacjonarnej w ramach danej polityki
+            if (policy.allowHybrid() || policy.allowOnsite()) {
+                searchContexts.add(SearchContext.builder()
+                        .keywords(finalKeywords)
+                        .location(policy.city())
+                        .remoteOnly(false) // remoteOnly = false oznacza, że szukamy ofert stacjonarnych/hybrydowych
+                        .maxResults(maxResults)
+                        .build());
+            }
+        }
+
+        // Jeśli globalne wyszukiwanie zdalne jest włączone, a nie ma polityki, która by je pokrywała
+        if (dynamicConfig.isAllowRemoteSearch() && !globalRemotePolicyExists) {
+            log.info("🌐 Dodaję globalny kontekst wyszukiwania zdalnego, ponieważ allowRemoteSearch jest true i brak dedykowanej polityki.");
+            searchContexts.add(SearchContext.builder()
+                    .keywords(finalKeywords)
+                    .location(null) // null oznacza globalne wyszukiwanie zdalne
+                    .remoteOnly(true)
+                    .maxResults(maxResults)
+                    .build());
+        }
+        
+        if (searchContexts.isEmpty()) {
+            log.warn("⚠️ Brak kontekstów wyszukiwania! Dodaję domyślny kontekst dla Javy w Polsce (zdalnie).");
+            searchContexts.add(SearchContext.builder()
+                    .keywords(List.of("java"))
+                    .location("Poland")
+                    .remoteOnly(true)
+                    .maxResults(maxResults)
+                    .build());
+        }
+
+        return searchContexts;
     }
 }
