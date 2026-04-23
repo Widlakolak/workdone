@@ -1,5 +1,6 @@
 package com.workdone.backend.interaction.discord;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.crypto.tink.subtle.Ed25519Verify;
@@ -10,6 +11,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.util.Map;
 
@@ -22,15 +24,15 @@ public class DiscordInteractionController {
     private static final int MESSAGE_COMPONENT = 3;
 
     private final DiscordInteractionService interactionService;
-    private final String publicKey;
+    private final byte[] decodedPublicKey;
     private final ObjectMapper objectMapper;
 
     public DiscordInteractionController(DiscordInteractionService interactionService,
                                         @Value("${workdone.discord.public-key:}") String publicKey,
                                         ObjectMapper objectMapper) {
         this.interactionService = interactionService;
-        this.publicKey = publicKey;
         this.objectMapper = objectMapper;
+        this.decodedPublicKey = (publicKey != null && !publicKey.isBlank()) ? Hex.decode(publicKey) : null;
     }
 
     @PostMapping
@@ -47,6 +49,7 @@ public class DiscordInteractionController {
             DiscordInteractionRequest request = objectMapper.readValue(rawBody, DiscordInteractionRequest.class);
 
             if (request.type() == PING) {
+                log.info("Received PING from Discord, responding with PONG.");
                 return ResponseEntity.ok(Map.of("type", 1));
             }
 
@@ -59,7 +62,7 @@ public class DiscordInteractionController {
             }
 
         } catch (Exception e) {
-            log.error("Error parsing Discord interaction", e);
+            log.error("Error parsing Discord interaction: {}", e.getMessage());
         }
 
         return ResponseEntity.ok(Map.of(
@@ -69,7 +72,7 @@ public class DiscordInteractionController {
     }
 
     private boolean verifySignature(String signature, String timestamp, String body) {
-        if (publicKey == null || publicKey.isBlank()) {
+        if (decodedPublicKey == null) {
             log.warn("Discord Public Key is not configured! Skipping signature verification (UNSAFE).");
             return true;
         }
@@ -80,8 +83,9 @@ public class DiscordInteractionController {
         }
 
         try {
-            Ed25519Verify verifier = new Ed25519Verify(Hex.decode(publicKey));
-            verifier.verify(Hex.decode(signature), (timestamp + body).getBytes());
+            Ed25519Verify verifier = new Ed25519Verify(decodedPublicKey);
+            byte[] message = (timestamp + body).getBytes(StandardCharsets.UTF_8);
+            verifier.verify(Hex.decode(signature), message);
             return true;
         } catch (IllegalArgumentException | GeneralSecurityException e) {
             log.warn("Invalid Discord signature: {}", e.getMessage());
@@ -89,6 +93,9 @@ public class DiscordInteractionController {
         }
     }
 
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public record DiscordInteractionRequest(int type, DiscordInteractionData data) {}
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public record DiscordInteractionData(@JsonProperty("custom_id") String customId) {}
 }
