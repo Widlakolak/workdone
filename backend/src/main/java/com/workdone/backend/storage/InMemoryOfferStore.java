@@ -59,4 +59,11 @@ public class InMemoryOfferStore implements OfferStore {
     public Optional<JobOfferRecord> findBySourceUrl(String sourceUrl) {
         return Optional.ofNullable(bySourceUrl.get(sourceUrl));
     }
+
+    @Override
+    public List<JobOfferRecord> findByStatus(OfferStatus status) {
+        return bySourceUrl.values().stream()
+                .filter(offer -> offer.status() == status)
+                .toList();
+    }
 }

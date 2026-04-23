@@ -19,11 +19,13 @@ public class LocationSignalService {
     private final LocationGuard locationGuard;
 
     public boolean isRemote(JobOfferRecord offer) {
-        return locationGuard.isRemote(offer);
+        String fullText = (offer.location() + " " + offer.rawDescription()).toLowerCase(Locale.ROOT);
+        return locationGuard.isRemote(fullText);
     }
 
     public boolean isHybrid(JobOfferRecord offer) {
-        return locationGuard.isHybrid(offer);
+        String fullText = (offer.location() + " " + offer.rawDescription()).toLowerCase(Locale.ROOT);
+        return locationGuard.isHybrid(fullText);
     }
 
     public boolean isPoland(JobOfferRecord offer) {

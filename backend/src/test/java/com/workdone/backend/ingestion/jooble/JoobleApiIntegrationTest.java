@@ -1,6 +1,7 @@
 package com.workdone.backend.ingestion.jooble;
 
 import com.workdone.backend.analysis.*;
+import com.workdone.backend.ingestion.SearchContext;
 import com.workdone.backend.profile.parser.CvSemanticParser;
 import com.workdone.backend.profile.service.CandidateProfileService;
 import com.workdone.backend.profile.service.CvAggregationService;
@@ -12,6 +13,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+
+import java.util.List;
 
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 
@@ -41,7 +44,12 @@ class JoobleApiIntegrationTest {
 
     @Test
     void checkActualJoobleResponse() {
-        var offers = joobleJobProvider.fetchOffers();
+        SearchContext context = SearchContext.builder()
+                .keywords(List.of("java"))
+                .location("Europe")
+                .remoteOnly(true)
+                .build();
+        var offers = joobleJobProvider.fetchOffers(context);
         assertThat(offers).isNotNull();
     }
 }

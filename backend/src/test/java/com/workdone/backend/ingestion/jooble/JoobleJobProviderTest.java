@@ -4,9 +4,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.workdone.backend.analysis.DynamicConfigService;
 import com.workdone.backend.analysis.LocationGuard;
 import com.workdone.backend.analysis.TechStackExtractor;
-import com.workdone.backend.ingestion.JobSearchParametersProvider;
 import com.workdone.backend.ingestion.SearchContext;
 import com.workdone.backend.model.JobOfferRecord;
+import com.workdone.backend.model.LocationPolicy;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mapstruct.factory.Mappers;
@@ -31,7 +31,6 @@ class JoobleJobProviderTest {
     private MockRestServiceServer mockServer;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final JoobleMapper joobleMapper = Mappers.getMapper(JoobleMapper.class);
-    private final JobSearchParametersProvider searchProvider = Mockito.mock(JobSearchParametersProvider.class);
     private final DynamicConfigService dynamicConfigService = Mockito.mock(DynamicConfigService.class);
     private final LocationGuard locationGuard = new LocationGuard(dynamicConfigService);
     private final TechStackExtractor techStackExtractor = new TechStackExtractor(); // Prawdziwy ekstraktor, bo jest bezstanowy
@@ -44,24 +43,23 @@ class JoobleJobProviderTest {
         JoobleProperties.Filters filters = new JoobleProperties.Filters(List.of("java"), "Lodz", true);
         JoobleProperties properties = new JoobleProperties(true, "dummy-key-123", "https://jooble.org/api/", filters);
         
-        SearchContext context = SearchContext.builder()
-                .keywords(List.of("java"))
-                .location("Lodz")
-                .remoteOnly(true)
-                .build();
-        
-        when(searchProvider.getContext()).thenReturn(context);
-        when(dynamicConfigService.getPreferredLocation()).thenReturn("Lodz");
+        when(dynamicConfigService.getLocationPolicies()).thenReturn(List.of(new LocationPolicy("Lodz", true, true, true, 5)));
 
         RestClient.Builder restClientBuilder = RestClient.builder();
         mockServer = MockRestServiceServer.bindTo(restClientBuilder).build();
 
-        joobleProvider = new JoobleJobProvider(restClientBuilder, properties, joobleMapper, searchProvider, locationGuard);
+        joobleProvider = new JoobleJobProvider(restClientBuilder, properties, joobleMapper, locationGuard);
     }
 
     @Test
     void shouldFetchAndFilterOffersFromJooble() throws Exception {
         // Given
+        SearchContext context = SearchContext.builder()
+                .keywords(List.of("java"))
+                .location("Lodz")
+                .remoteOnly(true)
+                .build();
+
         JoobleResponse.JoobleJob acceptedJob = new JoobleResponse.JoobleJob(
                 "1", "Java Dev", "Firm", "Lodz", "Desc", "10k", "url1", "Jooble", "remote", "2026-04-18"
         );
@@ -75,7 +73,7 @@ class JoobleJobProviderTest {
                 .andRespond(withSuccess(objectMapper.writeValueAsString(mockResponse), MediaType.APPLICATION_JSON));
 
         // When
-        List<JobOfferRecord> offers = joobleProvider.fetchOffers();
+        List<JobOfferRecord> offers = joobleProvider.fetchOffers(context);
 
         // Then
         mockServer.verify();

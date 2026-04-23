@@ -52,10 +52,8 @@ class RemotiveJobProviderTest {
                 .industry("engineering")
                 .build();
                 
-        when(jobSearchParametersProvider.getContext()).thenReturn(context);
-
         // WHEN
-        List<JobOfferRecord> offers = remotiveJobProvider.fetchOffers();
+        List<JobOfferRecord> offers = remotiveJobProvider.fetchOffers(context);
 
         // THEN
         System.out.println("Fetched " + offers.size() + " offers from Remotive API.");

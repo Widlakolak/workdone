@@ -52,10 +52,8 @@ class JobicyJobProviderTest {
                 .industry("engineering")
                 .build();
                 
-        when(jobSearchParametersProvider.getContext()).thenReturn(context);
-
         // WHEN
-        List<JobOfferRecord> offers = jobicyJobProvider.fetchOffers();
+        List<JobOfferRecord> offers = jobicyJobProvider.fetchOffers(context);
 
         // THEN
         System.out.println("Fetched " + offers.size() + " offers from Jobicy API.");

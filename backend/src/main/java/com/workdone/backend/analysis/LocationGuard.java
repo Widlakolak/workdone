@@ -6,7 +6,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.regex.Matcher;
@@ -83,12 +82,12 @@ public class LocationGuard {
         return false;
     }
 
-    // Metody pomocnicze do sprawdzania trybu pracy
-    private boolean isRemote(String text) {
+    // Metody pomocnicze do sprawdzania trybu pracy - Publiczne dla LocationSignalService
+    public boolean isRemote(String text) {
         return text.contains("remote") || text.contains("anywhere") || text.contains("100% remote") || text.contains("zdalna");
     }
 
-    private boolean isHybrid(String text) {
+    public boolean isHybrid(String text) {
         return text.contains("hybrid") || text.contains("hybrydowa");
     }
 

@@ -6,6 +6,7 @@ import com.rometools.rome.io.SyndFeedInput;
 import com.rometools.rome.io.XmlReader;
 import com.workdone.backend.analysis.LocationGuard;
 import com.workdone.backend.ingestion.JobProvider;
+import com.workdone.backend.ingestion.SearchContext;
 import com.workdone.backend.model.JobOfferRecord;
 import com.workdone.backend.model.OfferStatus;
 import lombok.RequiredArgsConstructor;
@@ -45,7 +46,7 @@ public class RssJobProvider implements JobProvider {
     }
 
     @Override
-    public List<JobOfferRecord> fetchOffers() {
+    public List<JobOfferRecord> fetchOffers(SearchContext context) {
         List<JobOfferRecord> allOffers = new ArrayList<>();
 
         for (RssProperties.RssSource source : properties.sources()) {

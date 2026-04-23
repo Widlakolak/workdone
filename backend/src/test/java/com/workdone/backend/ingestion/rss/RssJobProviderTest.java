@@ -1,5 +1,6 @@
 package com.workdone.backend.ingestion.rss;
 
+import com.workdone.backend.ingestion.SearchContext;
 import com.workdone.backend.model.JobOfferRecord;
 import com.workdone.backend.profile.service.CandidateProfileService;
 import com.workdone.backend.analysis.DynamicConfigService;
@@ -39,8 +40,15 @@ class RssJobProviderTest {
 
     @Test
     void shouldFetchOffersFromRealRssFeeds() {
+        // GIVEN
+        SearchContext context = SearchContext.builder()
+                .keywords(List.of("java"))
+                .location("poland")
+                .remoteOnly(true)
+                .build();
+
         // WHEN
-        List<JobOfferRecord> offers = rssJobProvider.fetchOffers();
+        List<JobOfferRecord> offers = rssJobProvider.fetchOffers(context);
 
         // THEN
         System.out.println("Fetched " + offers.size() + " offers from RSS feeds.");
@@ -53,8 +61,5 @@ class RssJobProviderTest {
             assertThat(first.sourceUrl()).startsWith("http");
             assertThat(first.sourcePlatform()).isNotNull();
         }
-        
-        // Zazwyczaj RSSy Java/Remote mają chociaż kilka ofert
-        // assertThat(offers).isNotEmpty(); 
     }
 }

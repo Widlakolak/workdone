@@ -5,6 +5,7 @@ import com.workdone.backend.profile.service.CandidateProfileService;
 import com.workdone.backend.analysis.DynamicConfigService;
 import com.workdone.backend.model.JobOfferRecord;
 import com.workdone.backend.model.OfferStatus;
+import com.workdone.backend.notification.DiscordNotifier;
 import com.workdone.backend.storage.InMemoryOfferStore;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -22,6 +23,7 @@ class DiscordInteractionServiceTest {
         DynamicConfigService dynamicConfig = Mockito.mock(DynamicConfigService.class);
         CandidateProfileService profileService = Mockito.mock(CandidateProfileService.class);
         OfferIngestionOrchestrator orchestrator = Mockito.mock(OfferIngestionOrchestrator.class);
+        DiscordNotifier discordNotifier = Mockito.mock(DiscordNotifier.class);
         
         String targetUrl = "https://example.com/job/1";
         
@@ -41,7 +43,7 @@ class DiscordInteractionServiceTest {
                 .sourcePlatform("JUST_JOIN_IT")
                 .build());
 
-        DiscordInteractionService service = new DiscordInteractionService(store, dynamicConfig, profileService, orchestrator);
+        DiscordInteractionService service = new DiscordInteractionService(store, dynamicConfig, profileService, orchestrator, discordNotifier);
         String result = service.handleCustomId("applied|" + targetUrl);
 
         // Poprawiłem asercję, żeby pasowała do faktycznego komunikatu z serwisu

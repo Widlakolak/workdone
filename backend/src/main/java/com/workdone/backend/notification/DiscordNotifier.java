@@ -33,7 +33,8 @@ public class DiscordNotifier {
     }
 
     public void sendInstant(JobOfferRecord offer) {
-        if (!properties.discord().instant().enabled() || isBlank(properties.discord().instant().url())) {
+        if (!properties.discord().instant().enabled()) {
+            log.debug("⏭️ Discord Instant disabled.");
             return;
         }
         String content = contentBuilder.buildInstantMessage(offer);
@@ -41,7 +42,8 @@ public class DiscordNotifier {
     }
 
     public void sendDigest(List<JobOfferRecord> offers) {
-        if (offers.isEmpty() || !properties.discord().digest().enabled() || isBlank(properties.discord().digest().url())) {
+        if (!properties.discord().digest().enabled()) {
+            log.debug("⏭️ Discord Digest disabled.");
             return;
         }
         String content = contentBuilder.buildDigestMessage(offers);
@@ -49,12 +51,17 @@ public class DiscordNotifier {
     }
 
     public void sendAiAlert(String message) {
-        if (isBlank(properties.discord().instant().url())) return;
         post(properties.discord().instant().url(), Map.of("content", "⚠️ **System Alert:** " + message));
     }
 
     public void sendControlPanel() {
-        if (isBlank(properties.discord().instant().url())) return;
+        String url = properties.discord().instant().url();
+        if (isBlank(url)) {
+            log.error("❌ Nie można wysłać panelu: URL webhooka (workdone.discord.instant.url) jest pustY!");
+            return;
+        }
+
+        log.info("📡 Próba wysłania panelu na URL: {}", url.substring(0, Math.min(url.length(), 30)) + "...");
 
         Map<String, Object> payload = Map.of(
                 "content", "🎮 **WorkDone Master Control Panel**",
@@ -76,7 +83,7 @@ public class DiscordNotifier {
                                 )
                         ),
                         Map.of(
-                                "type", 1, // Row 3: Semantic (AI Start)
+                                "type", 1,
                                 "components", List.of(
                                         Map.of("type", 2, "style", 2, "label", "AI 70%", "custom_id", "config|semantic|0.7"),
                                         Map.of("type", 2, "style", 2, "label", "AI 80%", "custom_id", "config|semantic|0.8"),
@@ -84,7 +91,7 @@ public class DiscordNotifier {
                                 )
                         ),
                         Map.of(
-                                "type", 1, // Row 4: Instant (Alert)
+                                "type", 1,
                                 "components", List.of(
                                         Map.of("type", 2, "style", 2, "label", "⚡ Instant 0.7", "custom_id", "config|instant|0.7"),
                                         Map.of("type", 2, "style", 2, "label", "⚡ Instant 0.8", "custom_id", "config|instant|0.8"),
@@ -92,7 +99,7 @@ public class DiscordNotifier {
                                 )
                         ),
                         Map.of(
-                                "type", 1, // Row 5: Digest (Daily)
+                                "type", 1,
                                 "components", List.of(
                                         Map.of("type", 2, "style", 2, "label", "📊 Digest 0.5", "custom_id", "config|digest|0.5"),
                                         Map.of("type", 2, "style", 2, "label", "📊 Digest 0.6", "custom_id", "config|digest|0.6"),
@@ -101,7 +108,7 @@ public class DiscordNotifier {
                         )
                 )
         );
-        post(properties.discord().instant().url(), payload);
+        post(url, payload);
     }
 
     private Object instantPayload(String content, String sourceUrl) {
@@ -120,7 +127,10 @@ public class DiscordNotifier {
     }
 
     private void post(String url, Object payload) {
-        if (url == null || url.isBlank() || url.contains("dummy")) return;
+        if (isBlank(url) || url.contains("dummy")) {
+            log.warn("⚠️ Próba wysyłki na pusty lub testowy URL Discorda.");
+            return;
+        }
         try {
             client.post()
                     .uri(url)
@@ -128,8 +138,9 @@ public class DiscordNotifier {
                     .body(payload)
                     .retrieve()
                     .toBodilessEntity();
+            log.info("✅ Wiadomość wysłana pomyślnie na Discorda.");
         } catch (Exception ex) {
-            log.warn("❌ Discord post error", ex);
+            log.error("❌ Błąd podczas wysyłania do Discorda: {}", ex.getMessage());
         }
     }
 

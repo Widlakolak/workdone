@@ -4,99 +4,78 @@ WorkDone to inteligentny backendowy agent rekrutacyjny działający 24/7. System
 
 ---
 
-## ✅ Aktualny Status: AI-Native Refactor (ZREALIZOWANY ✔️)
+## ✅ Najnowsze Aktualizacje (Panel Kontrolny & Multi-Location) ✔️
 
-[![Build & Push WorkDone](https://github.com/Widlakolak/workdone/actions/workflows/deploy.yml/badge.svg)](https://github.com/Widlakolak/workdone/actions/workflows/deploy.yml)
+System został rozbudowany o zaawansowane funkcje sterowania i precyzyjnego filtrowania:
 
-System realizuje zaawansowany pipeline AI zoptymalizowany pod kątem monitoringu i niezawodności:
-1.  **CV Embedding & Skill Extraction**: Profil kandydata jest wektoryzowany (Cohere) i analizowany pod kątem kluczowych technologii (LLM).
-2.  **Smart Ingestion**: Pobieranie ofert z wielu źródeł (**Jooble API**, **Jobicy API**, **Remotive API**, **RSS Aggregator**) z filtrowaniem lokalizacji (**LocationGuard**).
-3.  **Single Embedding Pattern**: Każda unikalna oferta jest wektoryzowana tylko raz dla celów deduplikacji i dopasowania.
-4.  **Vector Deduplication (pgvector)**: Sprawdzanie duplikacji w PostgreSQL **PRZED** kosztowną analizą LLM.
-5.  **Multi-Level AI Scoring & Fallback**: Głęboka analiza LLM z kaskadowym systemem odporności na awarie (**Groq -> OpenAI -> Gemini -> Semantic Fallback**) i alertami na Discordzie.
-6.  **Full Monitoring Console**: Powiadomienia Discord o każdym etapie (Start/Finish Ingestion), błędach providerów i wyczerpaniu limitów AI.
-7.  **Dynamic Control Panel**: Zarządzanie progami i konfiguracją prosto z Discorda.
+1.  **Multi-Location Policy**: Możliwość definiowania reguł dla wielu miast naraz. Każde miasto może mieć własną politykę (np. Berlin: tylko Remote, Łódź: Hybryda/Stacjonarnie/Remote + limit dni w biurze).
+2.  **Location Guard 2.0**: Inteligentny filtr wyciągający informacje o trybie pracy i liczbie dni w biurze bezpośrednio z treści ogłoszenia (Regex + Analiza kontekstowa).
+3.  **Master Control Panel (Discord)**: Interaktywny panel sterowania na Discordzie pozwalający na:
+    - Sprawdzanie aktualnego statusu filtrów.
+    - Zmianę progów AI (`Semantic`, `Instant`, `Digest`) jednym kliknięciem.
+    - Ręczne wyzwalanie procesu szukania ofert (`Run Ingestion`).
+    - Odświeżanie skilli i seniority bezpośrednio z plików CV.
+    - Zarządzanie "kolejką decyzji" (wyświetlanie ofert oczekujących na akceptację/odrzucenie).
+4.  **Pending Queue System**: Oferty zakwalifikowane przez system otrzymują status `ANALYZED` i czekają na Twoją decyzję (przycisk "Aplikowano" / "Odrzuć").
+
+---
+
+## 🎮 Panel Sterowania na Discordzie
+
+Aby wywołać interaktywny panel na serwerze Discord (jeśli nie jest jeszcze przypięty), wyślij zapytanie:
+`POST https://workdone.qzz.io/api/admin/test/show-panel`
+
+*Wskazówka: Po wywołaniu panelu na Discordzie, warto go **przypiąć (Pin)**, aby zawsze mieć pod ręką suwaki i przyciski statusu.*
 
 ---
 
 ## 🛠 Stack technologiczny
 
-- **Backend:** Java 21, **Spring Boot 4.0.5**
-- **Architektura:** Modern Clean Code (Lombok, MapStruct, **Spring AI 2.0.0-M4**)
+- **Backend:** Java 21, **Spring Boot 3.4+**
+- **Architektura:** Modern Clean Code (Lombok, MapStruct, Spring AI)
 - **Baza danych:** PostgreSQL 15 + **pgvector** (HNSW index)
 - **AI Models:**
   - **Embedding:** Cohere Multilingual v3 (1024d) - Primary / OpenAI text-embedding-3-small - Fallback
-  - **Scoring:** Groq Llama 3.3 70b (Primary) / OpenAI GPT-4o-mini / **Google Gemini 2.5 Flash Lite**
-- **Operacje:** Docker + GitHub Actions (CI/CD)
-- **Kanał użytkownika:** Discord (Instant alerts + Daily Digest + Interaction Buttons + System Status Alerts)
+  - **Scoring:** Groq Llama 3.3 70b (Primary) / OpenAI GPT-4o-mini / **Google Gemini 1.5 Flash**
+- **Interakcje:** Discord Webhooks + Interactions API (Cloudflare Tunnel / Ngrok)
 
 ---
 
 ## 🧠 Logika Procesu (Flow)
 
 ```plain
-CV → Parsing (Apache Tika) → AI Skill Extraction → Embedding (Cohere) → Profile Vector (Cache)
+CV → Parsing → AI Skill Extraction → Profile Vector (Cache)
 
 Offer →
-  Ingestion (Jooble / Jobicy / Remotive / RSS) →
-  LOCATION GUARD (Dynamic Filter) →
+  Ingestion (Multiple Cities & Contexts) →
+  LOCATION GUARD (Per-City Policy: Remote/Hybrid/Onsite + Days Limit) →
   TECH STACK EXTRACTION →
-  SINGLE EMBEDDING (Cohere/OpenAI Fallback) →
   VECTOR DEDUPLICATION (pgvector Search) →
-  IF Duplicate THEN: Skip
-  IF Unique THEN:
-    SAVE TO VECTOR STORE →
-    SEMANTIC MATCHING (Cosine Similarity) →
-    IF Score > dynamic_threshold THEN:
-      AI MULTI-MODEL SCORING (Groq -> OpenAI -> Gemini) →
-      (Alert Discord on Model Fallback/Limits)
-    PRIORITY BOOSTING →
-    Discord Notification (Instant/Digest/Alerts)
+  SEMANTIC MATCHING (Cosine Similarity) →
+  AI MULTI-MODEL SCORING (Groq -> OpenAI -> Gemini) →
+  STATUS ASSIGNMENT (ANALYZED) →
+  Discord Notification (Instant / Daily Digest)
 ```
 
-### Progi dopasowania (Dynamiczne)
-- `score >= 90` → Discord **Instant Alert**
-- `60 <= score < 90` → Discord **Daily Digest**
-- `40 <= score < 60` → Baza danych (Tracking)
-- `< 40` → Status `ARCHIVED`
+### Progi dopasowania (Zarządzane z Discorda/API)
+- `Instant Alert` (⚡) -> Powiadomienie natychmiastowe.
+- `Daily Digest` (📊) -> Zbiorczy raport raz na dobę.
+- `Pending Decision` (⏳) -> Oferty czekające na Twoje kliknięcie "Aplikowano/Odrzuć".
 
 ---
 
 ## 🏗 Struktura Projektu
 
-1.  **Ingestion** – Pobieranie danych: `RemotiveJobProvider` (API), `JobicyJobProvider` (API), `JoobleJobProvider` (API), `RssJobProvider` (RSS).
-2.  **Analysis** – Silnik oceny: `LocationGuard`, `OfferScoringService` (Multi-model), `DynamicConfigService`.
-3.  **Notification** – `DiscordNotifier` z obsługą alertów systemowych i interaktywnych paneli.
+1.  **Ingestion** – Pobieranie danych: `Jooble`, `Jobicy`, `Remotive`, `RSS`. Obsługuje listę `SearchContext` dla każdej lokalizacji.
+2.  **Analysis** – Silnik oceny: `LocationGuard`, `LocationPolicy`, `DynamicConfigService`.
+3.  **Interaction** – `DiscordInteractionController` obsługujący kliknięcia przycisków na Discordzie.
 4.  **Storage** – `PersistentOfferStore` (JPA) + `OfferVectorStore` (pgvector).
 
 ---
 
-## 📁 Źródła Danych (Zasoby)
-
-### Obecne (API):
-- **Jooble API**
-- **Jobicy API**
-- **Remotive API** (Zmigrowane z RSS)
-
-### Obecne (RSS):
-- **RemoteOK**
-- **WeWorkRemotely**
-
----
-
-## ▶️ Konfiguracja
-
-### Zmienne Środowiskowe:
-- `COHERE_API_KEY`: Embedding 1024d.
-- `GROQ_API_KEY`: Primary scoring.
-- `OPENAI_API_KEY`: Fallback scoring/embedding.
-- `GEMINI_API_KEY`: Tertiary scoring.
-- `DISCORD_PUBLIC_KEY`: Weryfikacja interakcji.
-- `DB_HOST`, `DB_NAME`, `DB_USERNAME`, `DB_PASSWORD`: PostgreSQL + pgvector.
-
----
-
 ## 🗺 Roadmapa
-- [ ] **Automatyczna Nauka**: Dynamiczne wagowanie na podstawie decyzji Applied/Reject.
+- [x] **Multi-Location Support** (Zrealizowane)
+- [x] **Discord Control Panel** (Zrealizowane)
+- [ ] **Angular Admin Dashboard**: Pełna wizualizacja ofert i ustawień.
 - [ ] **OCR Support**: Obsługa CV w formie obrazów.
-- [ ] **Growth Opportunity**: Wykrywanie ofert "prawie pasujących".
+- [ ] **Automatyczna Nauka**: Dynamiczne wagowanie na podstawie Twoich decyzji.
