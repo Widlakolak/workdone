@@ -134,5 +134,6 @@ public class DynamicConfigService {
                 bestOfferFallbackEnabled,
                 preferredSeniority,
                 policies
-        );    }
+        );
+    }
 }

@@ -49,6 +49,82 @@ Scheduler/manual trigger ->
     - opcjonalnie: best-offer fallback, jeśli w skanie nie było INSTANT
 ```
 
+```mermaid
+flowchart LR
+
+    %% ===== PROFILE =====
+    A[CV Files] --> B[Merge Documents]
+    B --> C[Parsing + Extraction<br/>keywords / seniority / location]
+    C --> D[Embedding]
+    D --> E[Profile Vector]
+
+    %% ===== TRIGGER =====
+    T[Scheduler / Manual Trigger]
+
+    %% ===== INGESTION =====
+    T --> F[Ingestion<br/>Providers × Search Contexts]
+
+    %% ===== PROCESSING =====
+    F --> G[Enrich Data]
+    G --> H[Deduplication]
+
+    %% ===== MATCHING =====
+    H --> I[Must-Have Filter]
+    I --> J[Semantic Scoring]
+
+    %% ===== OPTIONAL AI =====
+    J --> K{Deep AI Scoring?}
+    K -- YES --> L[Multi-Model AI Scoring]
+    K -- NO --> M
+
+    L --> M[Final Score]
+
+    %% ===== CLASSIFICATION =====
+    M --> N[Classification<br/>INSTANT / DIGEST / ARCHIVE]
+
+    %% ===== STORAGE =====
+    N --> O[Persist Offer]
+
+    %% ===== NOTIFICATION =====
+    O --> P[Discord Notify]
+
+    %% ===== PROFILE LINK =====
+    E -. used in .-> J
+```
+```mermaid
+flowchart TD
+
+    A[Offers Scored] --> B{Score Band}
+
+    %% ===== CLASSIFICATION =====
+    B -->|>= 90| C[INSTANT]
+    B -->|60-89| D[DIGEST]
+    B -->|40-59| E[STORE ONLY]
+    B -->|< 40| F[ARCHIVE]
+
+    %% ===== STORAGE =====
+    C --> G[Save Offer]
+    D --> G
+    E --> G
+    F --> G
+
+    %% ===== GLOBAL CONTEXT =====
+    G --> H[Batch Context<br/>All Offers in Run]
+
+    %% ===== DECISION =====
+    H --> I{Any INSTANT?}
+
+    %% ===== INSTANT PATH =====
+    I -->|YES| J[Send INSTANT alerts]
+
+    %% ===== FALLBACK =====
+    I -->|NO| K[Select BEST OFFER<br/>from ALL offers]
+    K --> L[Send fallback notification]
+
+    %% ===== DIGEST =====
+    D --> M[Daily Digest Queue]
+```
+
 > Uwaga: fallback „najlepszej oferty” **nie zastępuje** INSTANTów. INSTANTy nadal idą normalnie.
 
 ---

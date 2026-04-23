@@ -84,4 +84,69 @@ class OfferIngestionOrchestratorFallbackTest {
 
         Mockito.verify(notifier).sendInstant(analyzedOffer);
     }
+
+
+    @Test
+    void shouldContinueIngestionWhenCandidateVectorIsMissing() {
+        JobProvider provider = Mockito.mock(JobProvider.class);
+        OfferEnricher offerEnricher = Mockito.mock(OfferEnricher.class);
+        OfferStore store = Mockito.mock(OfferStore.class);
+        OfferProcessor offerProcessor = Mockito.mock(OfferProcessor.class);
+        CandidateProfileService candidateProfileService = Mockito.mock(CandidateProfileService.class);
+        OfferClassificationService classificationService = Mockito.mock(OfferClassificationService.class);
+        DiscordNotifier notifier = Mockito.mock(DiscordNotifier.class);
+        WorkDoneProperties properties = Mockito.mock(WorkDoneProperties.class);
+        OfferEmbeddingService embeddingService = Mockito.mock(OfferEmbeddingService.class);
+        JobSearchParametersProvider searchParametersProvider = Mockito.mock(JobSearchParametersProvider.class);
+        DynamicConfigService dynamicConfigService = Mockito.mock(DynamicConfigService.class);
+
+        OfferIngestionOrchestrator orchestrator = new OfferIngestionOrchestrator(
+                List.of(provider),
+                offerEnricher,
+                store,
+                offerProcessor,
+                candidateProfileService,
+                classificationService,
+                notifier,
+                properties,
+                embeddingService,
+                searchParametersProvider,
+                dynamicConfigService
+        );
+
+        JobOfferRecord rawOffer = JobOfferRecord.builder()
+                .id("2")
+                .fingerprint("fp-2")
+                .title("Backend Developer")
+                .companyName("ACME")
+                .sourceUrl("https://example.com/job/2")
+                .location("Remote")
+                .rawDescription("Desc")
+                .salaryRange("n/a")
+                .techStack(List.of("Java"))
+                .matchingScore(0.0)
+                .priorityScore(0.0)
+                .status(OfferStatus.NEW)
+                .publishedAt(LocalDateTime.now())
+                .sourcePlatform("TEST")
+                .build();
+
+        SearchContext context = SearchContext.builder().keywords(List.of("java")).location("Poland").remoteOnly(true).maxResults(10).build();
+
+        Mockito.when(candidateProfileService.getCandidateVector()).thenReturn(null);
+        Mockito.when(searchParametersProvider.getContexts()).thenReturn(List.of(context));
+        Mockito.when(provider.sourceName()).thenReturn("TEST_PROVIDER");
+        Mockito.when(provider.fetchOffers(context)).thenReturn(List.of(rawOffer));
+        Mockito.when(offerEnricher.cleanAndEnrich(rawOffer)).thenReturn(rawOffer);
+        Mockito.when(store.existsBySourceOrFingerprint(rawOffer)).thenReturn(false);
+        Mockito.when(embeddingService.embedOffers(List.of(rawOffer))).thenReturn(List.of(new float[] {0.1f}));
+        Mockito.when(offerProcessor.processOffer(Mockito.eq(rawOffer), Mockito.any(float[].class), Mockito.any(float[].class)))
+                .thenReturn(OfferProcessor.ProcessingResult.skipped());
+        Mockito.when(dynamicConfigService.isBestOfferFallbackEnabled()).thenReturn(false);
+
+        orchestrator.runIngestion();
+
+        Mockito.verify(provider).fetchOffers(context);
+        Mockito.verify(offerProcessor).processOffer(Mockito.eq(rawOffer), Mockito.any(float[].class), Mockito.any(float[].class));
+    }
 }

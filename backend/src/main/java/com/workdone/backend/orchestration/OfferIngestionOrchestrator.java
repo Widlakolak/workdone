@@ -63,8 +63,8 @@ public class OfferIngestionOrchestrator {
             
             float[] candidateVector = candidateProfileService.getCandidateVector();
             if (candidateVector == null) {
-                log.error("❌ Profil kandydata jest pusty!");
-                return;
+                log.error("❌ Profil kandydata jest pusty! Kontynuuję ingest bez dopasowania semantycznego.");
+                candidateVector = new float[0];
             }
 
             List<SearchContext> contexts = searchParametersProvider.getContexts();
@@ -113,7 +113,6 @@ public class OfferIngestionOrchestrator {
                                 if (bestOfferThisRun == null || result.offer().priorityScore() > bestOfferThisRun.priorityScore()) {
                                     bestOfferThisRun = result.offer();
                                 }
-                                totalNew++;
                             } catch (ObjectOptimisticLockingFailureException e) {
                                 log.warn("🔄 Optymistyczna blokada dla: {}", offer.title());
                             } catch (Exception e) {
