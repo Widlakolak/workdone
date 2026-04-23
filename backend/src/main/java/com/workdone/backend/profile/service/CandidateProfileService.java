@@ -98,16 +98,24 @@ public class CandidateProfileService {
             this.candidateVector = embeddingService.embed(profileText);
 
             // 3. Pytam AI o szczegóły (tagi, lata expa, lokalizacja)
-            CvSemanticParser.CvProfileResult result = cvSemanticParser.parse(profileText);
-            if (result != null) {
-                this.suggestedKeywords = result.topKeywords();
-                this.seniority = result.seniority();
-                this.location = result.location();
-                log.info("✅ Profil odświeżony. Seniority: {}, Location: {}, Keywords: {}", seniority, location, suggestedKeywords);
-                
-                // Synchronizacja lokalizacji z ogólną konfiguracją wyszukiwania
-                dynamicConfigService.syncWithProfile();
+            try {
+                CvSemanticParser.CvProfileResult result = cvSemanticParser.parse(profileText);
+                if (result != null) {
+                    this.suggestedKeywords = result.topKeywords();
+                    this.seniority = result.seniority();
+                    this.location = result.location();
+
+                    // Synchronizacja lokalizacji z ogólną konfiguracją wyszukiwania
+                    dynamicConfigService.syncWithProfile();
+                } else {
+                    log.warn("⚠️ Parser CV zwrócił pusty wynik. Zostawiam poprzednie metadane profilu.");
+                }
+            } catch (Exception parserException) {
+                log.warn("⚠️ Nie udało się odświeżyć metadanych CV ({}). Zostawiam poprzednie metadane, ale wektor profilu jest dostępny.",
+                        parserException.getMessage());
             }
+
+            log.info("✅ Profil odświeżony. Seniority: {}, Location: {}, Keywords: {}", seniority, location, suggestedKeywords);
             return true;
         } catch (Exception e) {
             log.error("❌ Błąd odświeżania profilu: {}", e.getMessage());

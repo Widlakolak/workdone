@@ -28,18 +28,18 @@ spring:
 
   ai:
     openai:
-      api-key: ${OPENAI_API_KEY}
+      api-key: ${SPRING_AI_OPENAI_API_KEY:${OPENAI_API_KEY:}}
       chat: { options: { model: gpt-4o-mini } }
     google:
       genai:
-        api-key: ${GEMINI_API_KEY}
+        api-key: ${SPRING_AI_GOOGLE_GENAI_API_KEY:${GEMINI_API_KEY:}}
         chat: { options: { model: gemini-2.5-flash-lite } }
     groq:
-      api-key: ${GROQ_API_KEY}
+      api-key: ${SPRING_AI_GROQ_API_KEY:${GROQ_API_KEY:}}
       base-url: https://api.groq.com/openai
       model: llama-3.3-70b-versatile
     cohere:
-      api-key: ${COHERE_API_KEY}
+      api-key: ${SPRING_AI_COHERE_API_KEY:${COHERE_API_KEY:}}
 
     vectorstore:
       pgvector:
