@@ -127,7 +127,12 @@ public class DynamicConfigService {
                 - Preferred Seniority: %s
                 - Location Policies:
                 %s
-                ""\".formatted(semanticThreshold, mustHaveKeywords, allowRemoteSearch, bestOfferFallbackEnabled, preferredSeniority, policies);
-                """.formatted(semanticThreshold, mustHaveKeywords, allowRemoteSearch, preferredSeniority, policies);
-    }
+                """.formatted(
+                semanticThreshold,
+                mustHaveKeywords,
+                allowRemoteSearch,
+                bestOfferFallbackEnabled,
+                preferredSeniority,
+                policies
+        );    }
 }
