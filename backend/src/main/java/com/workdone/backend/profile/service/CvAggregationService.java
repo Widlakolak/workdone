@@ -34,17 +34,25 @@ public class CvAggregationService {
         try {
             log.info("🔍 Zbieram i parsuję wszystkie pliki z: {}", basePath);
             return Files.walk(basePath)
-                    .filter(Files::isRegularFile)
+                    .filter(path -> {
+                        String fileName = path.getFileName().toString();
+                        // Ignorujemy foldery, ukryte pliki (zaczynające się od kropki) 
+                        // oraz pliki tymczasowe generowane przez systemy/NAS
+                        return Files.isRegularFile(path) 
+                                && !fileName.startsWith(".") 
+                                && !path.toString().contains("@")
+                                && (fileName.endsWith(".pdf") || fileName.endsWith(".docx") || fileName.endsWith(".txt"));
+                    })
                     .map(path -> {
                         try {
-                            // Każdy plik zamieniam na tekst
                             return parser.extractText(path);
                         } catch (Exception e) {
-                            log.error("❌ Coś poszło nie tak przy czytaniu CV: {}", path, e);
-                            return "[PARSE_ERROR] " + path.getFileName();
+                            log.error("❌ Błąd parsowania pliku {}: {}", path.getFileName(), e.getMessage());
+                            return ""; // Pomijamy uszkodzone pliki zamiast wrzucać błąd do tekstu profilu
                         }
                     })
-                    .collect(Collectors.joining("\n\n")); // Łączę teksty, oddzielając je pustymi liniami
+                    .filter(text -> !text.isBlank())
+                    .collect(Collectors.joining("\n\n---\n\n"));
         } catch (IOException e) {
             log.error("❌ Nie mogę się dobrać do katalogu z CV", e);
             throw new RuntimeException("Nie można odczytać katalogu CV", e);

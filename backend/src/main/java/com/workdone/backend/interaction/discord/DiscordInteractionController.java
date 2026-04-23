@@ -35,11 +35,10 @@ public class DiscordInteractionController {
 
     @PostMapping
     public ResponseEntity<Map<String, Object>> handleInteraction(
-            @RequestHeader("X-Signature-Ed25519") String signature,
-            @RequestHeader("X-Signature-Timestamp") String timestamp,
+            @RequestHeader(value = "X-Signature-Ed25519", required = false) String signature,
+            @RequestHeader(value = "X-Signature-Timestamp", required = false) String timestamp,
             @RequestBody String rawBody) {
 
-        // Discord wymaga sprawdzania sygnatury przy każdym strzale, inaczej odrzuci endpoint
         if (!verifySignature(signature, timestamp, rawBody)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
@@ -47,17 +46,15 @@ public class DiscordInteractionController {
         try {
             DiscordInteractionRequest request = objectMapper.readValue(rawBody, DiscordInteractionRequest.class);
 
-            // Discord wysyła PING, żeby sprawdzić, czy mój serwer żyje (np. przy zapisywaniu URL-a w panelu dev)
             if (request.type() == PING) {
                 return ResponseEntity.ok(Map.of("type", 1));
             }
 
-            // Obsługuję kliknięcia przycisków w wiadomościach z ofertami
             if (request.type() == MESSAGE_COMPONENT && request.data() != null) {
                 String resultMessage = interactionService.handleCustomId(request.data().customId());
                 return ResponseEntity.ok(Map.of(
                         "type", 4,
-                        "data", Map.of("content", resultMessage, "flags", 64) // flaga 64 sprawia, że odpowiedź widzę tylko ja (ephemeral)
+                        "data", Map.of("content", resultMessage, "flags", 64)
                 ));
             }
 
@@ -73,16 +70,21 @@ public class DiscordInteractionController {
 
     private boolean verifySignature(String signature, String timestamp, String body) {
         if (publicKey == null || publicKey.isBlank()) {
-            // Jak zapomnę klucza, to loguję ostrzeżenie, ale puszczam (przydatne przy szybkim devie)
             log.warn("Discord Public Key is not configured! Skipping signature verification (UNSAFE).");
             return true;
         }
+
+        if (signature == null || timestamp == null) {
+            log.warn("Missing signature or timestamp header.");
+            return false;
+        }
+
         try {
             Ed25519Verify verifier = new Ed25519Verify(Hex.decode(publicKey));
             verifier.verify(Hex.decode(signature), (timestamp + body).getBytes());
             return true;
-        } catch (GeneralSecurityException e) {
-            log.warn("Invalid Discord signature!");
+        } catch (IllegalArgumentException | GeneralSecurityException e) {
+            log.warn("Invalid Discord signature: {}", e.getMessage());
             return false;
         }
     }

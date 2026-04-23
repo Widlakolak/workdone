@@ -2,6 +2,7 @@ package com.workdone.backend.orchestration;
 
 import com.workdone.backend.analysis.MatchingBand;
 import com.workdone.backend.analysis.OfferClassificationService;
+import com.workdone.backend.analysis.OfferEmbeddingService;
 import com.workdone.backend.config.WorkDoneProperties;
 import com.workdone.backend.ingestion.JobProvider;
 import com.workdone.backend.model.JobOfferRecord;
@@ -16,15 +17,12 @@ import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
-/**
- * Wielki dyrygent całego procesu. Harmonogramuje pobieranie ofert i wysyłkę podsumowań. 
- * Pilnuje, żeby nie odpalić dwóch procesów pobierania naraz.
- */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -38,17 +36,14 @@ public class OfferIngestionOrchestrator {
     private final OfferClassificationService classificationService;
     private final DiscordNotifier notifier;
     private final WorkDoneProperties properties;
+    private final OfferEmbeddingService embeddingService;
 
-    // Prosta blokada, żeby nie nałożyć na siebie dwóch cykli pobierania
     private final AtomicBoolean isIngestionRunning = new AtomicBoolean(false);
 
-    /**
-     * Główny cykl pobierania ofert. Odpala się zgodnie z cronem (np. co godzinę).
-     */
     @Scheduled(cron = "${workdone.scheduling.ingestion-cron}", zone = "${workdone.scheduling.zone-id}")
     public void runIngestion() {
         if (!isIngestionRunning.compareAndSet(false, true)) {
-            log.warn("⚠️ [INGESTION] Proces już trwa, nie odpalam kolejnego.");
+            log.warn("⚠️ [INGESTION] Proces już trwa.");
             return;
         }
 
@@ -56,77 +51,68 @@ public class OfferIngestionOrchestrator {
         int totalNew = 0;
 
         try {
-            log.info("🚀 [INGESTION] Startujemy z szukaniem ofert...");
-            notifier.sendAiAlert("🚀 **Ingestion Cycle Started.** Searching for new opportunities...");
-
-            // Bez mojego profilu wektorowego nie ma co szukać, bo nie mamy z czym porównywać
+            log.info("🚀 [INGESTION] Startujemy...");
+            
             float[] candidateVector = candidateProfileService.getCandidateVector();
             if (candidateVector == null) {
-                log.error("❌ Mój profil jest pusty! Napraw to (wrzuć CV).");
-                notifier.sendAiAlert("❌ **CRITICAL:** Candidate profile is empty! Please upload CV to enable matching.");
+                log.error("❌ Profil kandydata jest pusty!");
                 return;
             }
 
             for (JobProvider provider : providers) {
                 try {
-                    log.info("🔍 --- Przeczesuję: {} ---", provider.sourceName());
-
+                    log.info("🔍 --- Provider: {} ---", provider.sourceName());
                     List<JobOfferRecord> rawOffers = provider.fetchOffers();
-                    int foundCount = rawOffers.size();
-                    totalFound += foundCount;
-                    log.info("📥 Dostałem {} surowych ofert od {}", foundCount, provider.sourceName());
+                    totalFound += rawOffers.size();
 
-                    // Czyścimy, nadajemy fingerprinty i wywalamy to, co już mam w bazie
-                    List<JobOfferRecord> offersToProcess = rawOffers.stream()
+                    List<JobOfferRecord> newOffers = rawOffers.stream()
                             .map(offerEnricher::cleanAndEnrich)
-                            .collect(Collectors.toMap(
-                                    JobOfferRecord::fingerprint,
-                                    o -> o,
-                                    (o1, o2) -> o1,
-                                    LinkedHashMap::new))
+                            .collect(Collectors.toMap(JobOfferRecord::fingerprint, o -> o, (o1, o2) -> o1, LinkedHashMap::new))
                             .values().stream()
                             .filter(offer -> !store.existsBySourceOrFingerprint(offer))
                             .toList();
-                    
-                    int newCount = offersToProcess.size();
-                    totalNew += newCount;
-                    log.info("📥 Mam {} całkiem nowych, unikalnych ofert do analizy z {}", newCount, provider.sourceName());
 
-                    for (JobOfferRecord offerRecord : offersToProcess) {
+                    if (newOffers.isEmpty()) continue;
+
+                    log.info("📥 Przetwarzam {} nowych ofert z {} (Batch Embedding)...", newOffers.size(), provider.sourceName());
+                    
+                    // Batching embeddingów - to oszczędza RPM w Cohere!
+                    List<float[]> offerVectors = new ArrayList<>();
+                    try {
+                        offerVectors = embeddingService.embedOffers(newOffers);
+                    } catch (Exception e) {
+                        log.error("❌ Błąd batch embeddingu dla {}: {}. Próbuję procesować pojedynczo.", provider.sourceName(), e.getMessage());
+                    }
+
+                    for (int i = 0; i < newOffers.size(); i++) {
+                        JobOfferRecord offer = newOffers.get(i);
+                        float[] vector = (offerVectors.size() > i) ? offerVectors.get(i) : null;
+                        
                         try {
-                            offerProcessor.processOffer(offerRecord, candidateVector);
+                            offerProcessor.processOffer(offer, candidateVector, vector);
+                            totalNew++;
                         } catch (ObjectOptimisticLockingFailureException e) {
-                            log.warn("🔄 Ktoś już edytował tę ofertę ({}), odpuszczam.", offerRecord.title());
+                            log.warn("🔄 Optymistyczna blokada dla: {}", offer.title());
                         } catch (Exception e) {
-                            log.error("❌ Błąd przy procesowaniu {}: {}", offerRecord.title(), e.getMessage());
+                            log.error("❌ Błąd przy procesowaniu {}: {}", offer.title(), e.getMessage());
                         }
                     }
                 } catch (Exception e) {
                     log.error("❌ Błąd dostawcy {}: {}", provider.sourceName(), e.getMessage());
-                    notifier.sendAiAlert("⚠️ Provider **" + provider.sourceName() + "** failed: " + e.getMessage());
                 }
             }
-            log.info("🏁 [INGESTION] Koniec cyklu. Łącznie znaleziono: {}, Nowych: {}", totalFound, totalNew);
-            notifier.sendAiAlert("🏁 **Ingestion Cycle Finished.** Total found: " + totalFound + ", New analyzed: " + totalNew);
+            log.info("🏁 [INGESTION] Koniec. Znaleziono: {}, Przetworzono: {}", totalFound, totalNew);
         } finally {
             isIngestionRunning.set(false);
         }
     }
 
-    /**
-     * Generuje i wysyła codzienne podsumowanie ofert "Dobre, ale nie pilne" (DIGEST).
-     */
     @Scheduled(cron = "${workdone.scheduling.digest-cron}", zone = "${workdone.scheduling.zone-id}")
     public void sendDailyDigest() {
-        log.info("📊 Szykuję raport dzienny...");
         LocalDate today = LocalDate.now(ZoneId.of(properties.scheduling().zoneId()));
-        
-        // Wybieram tylko te oferty z dzisiaj, które wylądowały w kubełku DIGEST
         List<JobOfferRecord> digestOffers = store.findForDigest(today).stream()
                 .filter(offer -> classificationService.classify(offer.priorityScore()) == MatchingBand.DIGEST)
                 .toList();
-
-        log.info("📊 Znaleziono {} ofert do raportu.", digestOffers.size());
         notifier.sendDigest(digestOffers);
     }
 }

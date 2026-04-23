@@ -1,18 +1,18 @@
 package com.workdone.backend.analysis;
 
 import com.workdone.backend.config.WorkDoneProperties;
+import com.workdone.backend.format.OfferContentBuilder;
 import com.workdone.backend.model.JobOfferRecord;
+import com.workdone.backend.notification.DiscordNotifier;
 import com.workdone.backend.profile.service.CandidateProfileService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
-import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.embedding.EmbeddingModel;
-
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -28,21 +28,22 @@ class PipelineFallbackIntegrationTest {
     @Mock private ChatModel openAiModel;
     @Mock private ChatModel geminiModel;
     @Mock private EmbeddingModel cohereModel;
-    @Mock private EmbeddingModel openAiEmbeddingModel;
     @Mock private DynamicConfigService dynamicConfigService;
     @Mock private CandidateProfileService candidateProfileService;
     @Mock private WorkDoneProperties properties;
+    @Mock private DiscordNotifier discordNotifier;
+    @Mock private OfferContentBuilder contentBuilder;
 
     @BeforeEach
     void setUp() {
         scoringService = new OfferScoringService(
                 groqModel, openAiModel, geminiModel, properties,
-                dynamicConfigService, candidateProfileService
+                dynamicConfigService, candidateProfileService, discordNotifier
         );
         scoringService.init();
 
-        // Inicjalizujemy serwis z oboma modelami, żeby sprawdzić fallback
-        embeddingService = new OfferEmbeddingService(cohereModel, openAiEmbeddingModel);
+        // Teraz OfferEmbeddingService przyjmuje jeden model (zazwyczaj fallbackowy) i builder
+        embeddingService = new OfferEmbeddingService(cohereModel, contentBuilder);
     }
 
     @Test
@@ -58,14 +59,14 @@ class PipelineFallbackIntegrationTest {
 
         verify(groqModel, atLeastOnce()).call(any(Prompt.class));
         verify(openAiModel, atLeastOnce()).call(any(Prompt.class));
+        verify(discordNotifier, atLeastOnce()).sendAiAlert(anyString());
     }
 
     @Test
-    void shouldFallbackToOpenAiEmbeddingWhenCohereFails() {
+    void shouldReturnEmbeddingFromModel() {
         // GIVEN
-        when(cohereModel.embed(anyString())).thenThrow(new RuntimeException("Cohere error"));
         float[] expected = new float[]{0.5f};
-        when(openAiEmbeddingModel.embed(anyString())).thenReturn(expected);
+        when(cohereModel.embed(anyString())).thenReturn(expected);
 
         // WHEN
         float[] result = embeddingService.embed("test");
@@ -73,6 +74,5 @@ class PipelineFallbackIntegrationTest {
         // THEN
         assertThat(result).isEqualTo(expected);
         verify(cohereModel).embed("test");
-        verify(openAiEmbeddingModel).embed("test");
     }
 }

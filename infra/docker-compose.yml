@@ -95,6 +95,8 @@ services:
     command: tunnel --no-autoupdate run --protocol http2
     environment:
       TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+      - nginx
     networks:
       - shared-net
 

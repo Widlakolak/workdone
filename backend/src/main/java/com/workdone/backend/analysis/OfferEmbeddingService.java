@@ -1,61 +1,49 @@
 package com.workdone.backend.analysis;
 
+import com.workdone.backend.format.OfferContentBuilder;
 import com.workdone.backend.model.JobOfferRecord;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 
 @Slf4j
 @Service
 public class OfferEmbeddingService {
 
-    private final EmbeddingModel cohereModel;
-    private final EmbeddingModel openAiModel;
+    private final EmbeddingModel embeddingModel;
+    private final OfferContentBuilder contentBuilder;
 
     public OfferEmbeddingService(
-            @Qualifier("fallbackEmbeddingModel") EmbeddingModel cohereModel,
-            @Qualifier("openAiEmbeddingModel") EmbeddingModel openAiModel) {
-        this.cohereModel = cohereModel;
-        this.openAiModel = openAiModel;
+            @Qualifier("fallbackEmbeddingModel") EmbeddingModel embeddingModel,
+            OfferContentBuilder contentBuilder) {
+        this.embeddingModel = embeddingModel;
+        this.contentBuilder = contentBuilder;
     }
 
     public float[] embed(String text) {
-        try {
-            log.debug("🔍 Próbuję wygenerować embedding przez Cohere...");
-            return cohereModel.embed(text);
-        } catch (Exception e) {
-            log.warn("⚠️ Błąd Cohere, próbuję fallback na OpenAI: {}", e.getMessage());
-            try {
-                return openAiModel.embed(text);
-            } catch (Exception ex) {
-                log.error("❌ Oba modele embeddingu zawiodły!");
-                throw ex;
-            }
-        }
+        return embeddingModel.embed(text);
+    }
+
+    public List<float[]> embedBatch(List<String> texts) {
+        if (texts == null || texts.isEmpty()) return List.of();
+        log.info("🚀 Generuję embeddingi dla paczki {} tekstów...", texts.size());
+        return embeddingModel.embed(texts);
+    }
+
+    public List<float[]> embedOffers(List<JobOfferRecord> offers) {
+        List<String> inputs = offers.stream()
+                .map(contentBuilder::buildTechnicalContent)
+                .toList();
+        return embedBatch(inputs);
     }
 
     public float[] embedOffer(JobOfferRecord offer) {
-        String input = """
-                title: %s
-                company: %s
-                location: %s
-                tech: %s
-                description: %s
-                """.formatted(
-                defaultText(offer.title()),
-                defaultText(offer.companyName()),
-                defaultText(offer.location()),
-                Objects.toString(offer.techStack(), "[]"),
-                defaultText(offer.rawDescription())
-        );
-
+        String input = contentBuilder.buildTechnicalContent(offer);
         return embed(input);
-    }
-
-    private static String defaultText(String value) {
-        return value == null ? "" : value;
     }
 }

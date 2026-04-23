@@ -2,6 +2,7 @@ package com.workdone.backend.config;
 
 import com.cohere.api.Cohere;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.ai.google.genai.GoogleGenAiChatModel;
@@ -18,6 +19,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Primary;
 
+@Slf4j
 @Configuration
 public class AiConfig {
 
@@ -34,7 +36,6 @@ public class AiConfig {
             @Value("${spring.ai.groq.base-url}") String baseUrl,
             @Value("${spring.ai.groq.model}") String model) {
         
-        // Groq jest kompatybilny z API OpenAI, więc używam OpenAiApi do połączenia
         var api = OpenAiApi.builder()
                 .baseUrl(baseUrl)
                 .apiKey(apiKey)
@@ -86,14 +87,14 @@ public class AiConfig {
     public EmbeddingModel fallbackEmbeddingModel(
             @Qualifier("cohereAiEmbeddingModel") EmbeddingModel primaryModel,
             @Qualifier("openAiEmbeddingModel") EmbeddingModel fallbackModel) {
-        // Dekorator dla modeli embeddingu: jak Cohere (tańsze/lepsze do tekstu) padnie, 
-        // to automatycznie przełączam się na OpenAI, żeby system nie stanął.
+        
         return new EmbeddingModel() {
             @Override
             public float[] embed(String text) {
                 try {
                     return primaryModel.embed(text);
                 } catch (Exception e) {
+                    log.warn("⚠️ Cohere embedding failed, falling back to OpenAI. Reason: {}", e.getMessage());
                     return fallbackModel.embed(text);
                 }
             }
@@ -103,6 +104,7 @@ public class AiConfig {
                 try {
                     return primaryModel.embed(document);
                 } catch (Exception e) {
+                    log.warn("⚠️ Cohere embedding (document) failed, falling back to OpenAI. Reason: {}", e.getMessage());
                     return fallbackModel.embed(document);
                 }
             }
@@ -112,6 +114,7 @@ public class AiConfig {
                 try {
                     return primaryModel.call(request);
                 } catch (Exception e) {
+                    log.warn("⚠️ Cohere embedding (batch) failed, falling back to OpenAI. Reason: {}", e.getMessage());
                     return fallbackModel.call(request);
                 }
             }
