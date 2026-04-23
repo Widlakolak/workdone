@@ -70,6 +70,7 @@ workdone:
     digest-cron: "0 0 18 * * *"
     zone-id: Europe/Warsaw
   discord:
+    token: ${DISCORD_TOKEN:}
     public-key: ${DISCORD_PUBLIC_KEY}
     instant:
       enabled: ${DISCORD_INSTANT_ENABLED:true}
@@ -82,7 +83,7 @@ workdone:
       enabled: true
       sources:
         - name: "RemoteOK"
-          url: "https://remoteok.com/remote-java-jobs.rss"
+          url: "https://remoteok.com/remote-java-jobs.rss" 
         - name: "WeWorkRemotely"
           url: "https://weworkremotely.com/categories/remote-back-end-programming-jobs.rss"
     remotive:
