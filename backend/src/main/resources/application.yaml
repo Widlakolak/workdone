@@ -71,6 +71,7 @@ workdone:
     zone-id: Europe/Warsaw
   discord:
     token: ${DISCORD_TOKEN:}
+    channel-id: ${DISCORD_CHANNEL_ID:}
     public-key: ${DISCORD_PUBLIC_KEY}
     instant:
       enabled: ${DISCORD_INSTANT_ENABLED:true}

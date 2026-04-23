@@ -27,8 +27,7 @@ public record WorkDoneProperties(
 
     public record Scheduling(String ingestionCron, String digestCron, String zoneId) {}
 
-    // Dodajemy pole token do konfiguracji Discorda
-    public record Discord(String token, Webhook instant, Webhook digest) {}
+    public record Discord(String token, String channelId, Webhook instant, Webhook digest) {}
 
     public record Webhook(boolean enabled, String url) {}
 

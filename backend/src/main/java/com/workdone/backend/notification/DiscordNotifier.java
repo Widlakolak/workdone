@@ -12,12 +12,10 @@ import org.springframework.web.client.RestClient;
 import jakarta.annotation.PostConstruct;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
- * Serwis od powiadomień. Wysyła gotowe sformatowane wiadomości na moje kanały Discorda. 
- * Wykorzystuje Webhooki dla prostych powiadomień i Bot API dla interaktywnych paneli.
+ * Serwis od powiadomień. 
+ * Wykorzystuje Bot API dla interaktywnych paneli i Webhooki jako fallback.
  */
 @Slf4j
 @Component
@@ -28,7 +26,6 @@ public class DiscordNotifier {
     private final OfferContentBuilder contentBuilder;
 
     private RestClient client;
-    private static final Pattern WEBHOOK_URL_PATTERN = Pattern.compile("discord\\.com/api/webhooks/(\\d+)/");
 
     @PostConstruct
     public void init() {
@@ -52,7 +49,6 @@ public class DiscordNotifier {
     }
 
     public void sendControlPanel() {
-        String webhookUrl = properties.discord().instant().url();
         Map<String, Object> payload = Map.of(
                 "content", "🎮 **WorkDone Master Control Panel**",
                 "components", List.of(
@@ -83,54 +79,43 @@ public class DiscordNotifier {
                         ))
                 )
         );
-        postMessage(webhookUrl, payload);
+        postMessage(properties.discord().instant().url(), payload);
     }
 
-    private void postMessage(String url, Object payload) {
+    private void postMessage(String webhookUrl, Object payload) {
         String token = properties.discord().token();
+        String channelId = properties.discord().channelId();
         
-        // Jeśli mamy token bota, używamy pełnego API (odblokowuje przyciski)
-        if (!isBlank(token) && !isBlank(url)) {
-            String channelId = extractChannelId(url);
-            if (channelId != null) {
-                try {
-                    client.post()
-                            .uri("https://discord.com/api/v10/channels/" + channelId + "/messages")
-                            .header("Authorization", "Bot " + token)
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .body(payload)
-                            .retrieve()
-                            .toBodilessEntity();
-                    log.info("✅ Wiadomość wysłana przez Bot API (z przyciskami).");
-                    return;
-                } catch (Exception ex) {
-                    log.error("❌ Błąd Bot API (próbuję fallback na Webhook): {}", ex.getMessage());
-                }
+        if (!isBlank(token) && !isBlank(channelId)) {
+            try {
+                client.post()
+                        .uri("https://discord.com/api/v10/channels/" + channelId + "/messages")
+                        .header("Authorization", "Bot " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body(payload)
+                        .retrieve()
+                        .toBodilessEntity();
+                log.info("✅ Wiadomość wysłana przez Bot API (Channel ID: {}).", channelId);
+                return;
+            } catch (Exception ex) {
+                log.error("❌ Błąd Bot API (ID: {}): {}", channelId, ex.getMessage());
             }
         }
         
-        // Fallback na zwykły Webhook (może nie wyświetlać przycisków)
-        postToWebhook(url, payload);
-    }
-
-    private void postToWebhook(String url, Object payload) {
-        if (isBlank(url) || url.contains("dummy")) return;
-        try {
-            client.post()
-                    .uri(url)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .body(payload)
-                    .retrieve()
-                    .toBodilessEntity();
-            log.info("✅ Wiadomość wysłana przez Webhook.");
-        } catch (Exception ex) {
-            log.error("❌ Błąd Webhooka: {}", ex.getMessage());
+        // Fallback na Webhook
+        if (!isBlank(webhookUrl)) {
+            try {
+                client.post()
+                        .uri(webhookUrl)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body(payload)
+                        .retrieve()
+                        .toBodilessEntity();
+                log.info("✅ Wiadomość wysłana przez Webhook (fallback).");
+            } catch (Exception ex) {
+                log.error("❌ Błąd Webhooka: {}", ex.getMessage());
+            }
         }
-    }
-
-    private String extractChannelId(String url) {
-        Matcher matcher = WEBHOOK_URL_PATTERN.matcher(url);
-        return matcher.find() ? matcher.group(1) : null;
     }
 
     private Object instantPayload(String content, String sourceUrl) {
