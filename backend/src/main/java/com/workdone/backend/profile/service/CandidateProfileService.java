@@ -71,7 +71,7 @@ public class CandidateProfileService {
         
         // Na start aplikacji odświeżam profil w osobnym wątku, żeby nie mulić startu Springa
         log.info("🚀 Inicjalne odświeżanie profilu CV...");
-        CompletableFuture.runAsync(this::refreshProfile)
+        CompletableFuture.runAsync(() -> refreshProfile())
                 .exceptionally(ex -> {
                     log.error("❌ Błąd inicjalizacji profilu: {}", ex.getMessage());
                     return null;
@@ -82,14 +82,14 @@ public class CandidateProfileService {
      * Główna metoda odświeżająca dane o mnie. 
      * Łączy pliki CV, tworzy wektor i wyciąga cechy przez AI.
      */
-    public synchronized void refreshProfile() {
+    public synchronized boolean refreshProfile() {
         log.info("🔄 Odświeżanie profilu kandydata...");
         try {
             // 1. Zbieram tekst ze wszystkich PDF-ów w folderze
             String profileText = cvAggregationService.buildMergedProfile();
             if (profileText == null || profileText.isBlank()) {
                 log.warn("⚠️ Brak dokumentów profilu!");
-                return;
+                return false;
             }
 
             this.latestProfileText = profileText;
@@ -108,8 +108,10 @@ public class CandidateProfileService {
                 // Synchronizacja lokalizacji z ogólną konfiguracją wyszukiwania
                 dynamicConfigService.syncWithProfile();
             }
+            return true;
         } catch (Exception e) {
             log.error("❌ Błąd odświeżania profilu: {}", e.getMessage());
+            return false;
         }
     }
 

@@ -30,13 +30,13 @@ public class OfferProcessor {
     private final OfferVectorStore vectorStore;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
-    public void processOffer(JobOfferRecord offer, float[] candidateVector) {
-        processOffer(offer, candidateVector, null);
+    public ProcessingResult processOffer(JobOfferRecord offer, float[] candidateVector) {
+        return processOffer(offer, candidateVector, null);
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
-    public void processOffer(JobOfferRecord offer, float[] candidateVector, float[] precomputedVector) {
-        
+    public ProcessingResult processOffer(JobOfferRecord offer, float[] candidateVector, float[] precomputedVector) {
+
         String technicalContent = contentBuilder.buildTechnicalContent(offer);
         float[] offerVector = precomputedVector;
 
@@ -45,13 +45,13 @@ public class OfferProcessor {
                 offerVector = embeddingService.embed(technicalContent);
             } catch (Exception e) {
                 log.error("❌ Błąd embeddingu dla {}: {}", offer.title(), e.getMessage());
-                return;
+                return ProcessingResult.skipped();
             }
         }
 
         if (deduplicationService.isDuplicate(offerVector)) {
             log.debug("⏭️ Duplikat treści: {}", offer.title());
-            return;
+            return ProcessingResult.skipped();
         }
 
         vectorStore.save(offer, technicalContent);
@@ -59,7 +59,7 @@ public class OfferProcessor {
         ScoringAnalysis analysis = scoringFacade.score(offer, candidateVector, offerVector);
         
         if (analysis.isRejected()) {
-            return;
+            return ProcessingResult.skipped();
         }
 
         log.info("⚖️ ANALIZA: {} | DOPASOWANIE: {}%", offer.title(), String.format("%.1f", analysis.baseScore()));
@@ -74,6 +74,14 @@ public class OfferProcessor {
 
         if (analysis.band() == MatchingBand.INSTANT) {
             notifier.sendInstant(enriched);
+        }
+
+        return new ProcessingResult(enriched, analysis.band(), true);
+    }
+
+    public record ProcessingResult(JobOfferRecord offer, MatchingBand band, boolean processed) {
+        public static ProcessingResult skipped() {
+            return new ProcessingResult(null, null, false);
         }
     }
 }

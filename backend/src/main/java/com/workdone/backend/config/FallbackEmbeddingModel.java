@@ -5,6 +5,7 @@ import org.springframework.ai.document.Document;
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.ai.embedding.EmbeddingResponse;
 import org.springframework.ai.embedding.EmbeddingRequest;
+import org.springframework.context.annotation.Primary;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
@@ -12,6 +13,7 @@ import java.util.List;
 
 @Slf4j
 @Component
+@Primary
 public class FallbackEmbeddingModel implements EmbeddingModel {
 
     private final EmbeddingModel primaryModel;

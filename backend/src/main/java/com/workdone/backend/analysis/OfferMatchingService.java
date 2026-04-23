@@ -17,8 +17,8 @@ public class OfferMatchingService {
     private final DynamicConfigService dynamicConfig;
 
     public boolean passesMustHave(JobOfferRecord offer) {
-        String context = (offer.title() + " " + offer.rawDescription() + " " + offer.techStack())
-                .toLowerCase(Locale.ROOT);
+        String context = normalize((offer.title() + " " + offer.rawDescription() + " " + offer.techStack())
+                .toLowerCase(Locale.ROOT));
 
         // Najpierw sprawdzam moje własne słowa kluczowe (te, które ręcznie wrzuciłem przez bota na Discordzie)
         List<String> dynamicMustHave = dynamicConfig.getMustHaveKeywords();
@@ -64,6 +64,5 @@ public class OfferMatchingService {
     }
 
     private String normalize(String s) {
-        return s.toLowerCase().replace("-", "").replace(" ", "");
-    }
+        return s == null ? "" : s.toLowerCase().replace("-", "").replace(" ", "");    }
 }

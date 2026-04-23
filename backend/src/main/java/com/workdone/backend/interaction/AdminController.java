@@ -33,7 +33,10 @@ public class AdminController {
     @PostMapping("/refresh-profile")
     public String refreshProfile() {
         log.info("🛠 Odświeżam moje dane z CV ręcznie z API.");
-        profileService.refreshProfile();
+        boolean refreshed = profileService.refreshProfile();
+        if (!refreshed) {
+            return "❌ Nie udało się odświeżyć profilu. Sprawdź logi backendu (np. quota/API).";
+        }
         return "✅ Skille i seniority odświeżone! Teraz jestem: " + profileService.getSeniority();
     }
 

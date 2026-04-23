@@ -52,4 +52,35 @@ class DiscordInteractionServiceTest {
         JobOfferRecord updated = store.findBySourceUrl(targetUrl).orElseThrow();
         assertThat(updated.status()).isEqualTo(OfferStatus.APPLIED);
     }
+
+    @Test
+    void shouldNotOverrideMustHaveWhenCvKeywordsAreEmpty() {
+        InMemoryOfferStore store = new InMemoryOfferStore();
+        DynamicConfigService dynamicConfig = Mockito.mock(DynamicConfigService.class);
+        CandidateProfileService profileService = Mockito.mock(CandidateProfileService.class);
+        OfferIngestionOrchestrator orchestrator = Mockito.mock(OfferIngestionOrchestrator.class);
+        DiscordNotifier discordNotifier = Mockito.mock(DiscordNotifier.class);
+        Mockito.when(profileService.getSuggestedKeywords()).thenReturn(List.of());
+
+        DiscordInteractionService service = new DiscordInteractionService(store, dynamicConfig, profileService, orchestrator, discordNotifier);
+        String result = service.handleCustomId("config|use_cv_skills");
+
+        assertThat(result).contains("❌ Brak słów kluczowych z CV");
+        Mockito.verify(dynamicConfig, Mockito.never()).updateConfig(Mockito.anyString(), Mockito.anyString());
+    }
+
+    @Test
+    void shouldReturnErrorWhenCvRefreshFails() {
+        InMemoryOfferStore store = new InMemoryOfferStore();
+        DynamicConfigService dynamicConfig = Mockito.mock(DynamicConfigService.class);
+        CandidateProfileService profileService = Mockito.mock(CandidateProfileService.class);
+        OfferIngestionOrchestrator orchestrator = Mockito.mock(OfferIngestionOrchestrator.class);
+        DiscordNotifier discordNotifier = Mockito.mock(DiscordNotifier.class);
+        Mockito.when(profileService.refreshProfile()).thenReturn(false);
+
+        DiscordInteractionService service = new DiscordInteractionService(store, dynamicConfig, profileService, orchestrator, discordNotifier);
+        String result = service.handleCustomId("config|refresh_cv");
+
+        assertThat(result).contains("❌ Nie udało się odświeżyć CV");
+    }
 }

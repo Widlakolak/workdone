@@ -53,7 +53,8 @@ public class OfferScoringFacade {
         double baseScore = semanticScore;
         // Jeśli podobieństwo semantyczne jest obiecujące, odpalam ciężką artylerię - analizę przez LLM
         // Tu sprawdzam czy to nie duplikat, żeby nie bulić za AI (notatka: to jest ten drogi krok LLM)
-        if (semanticScore >= dynamicConfig.getSemanticThreshold()) {
+        double semanticThresholdPercent = normalizeSemanticThreshold(dynamicConfig.getSemanticThreshold());
+        if (semanticScore >= semanticThresholdPercent) {
             Double aiScore = aiAnalysisFacade.performDeepAnalysis(offer);
             if (aiScore != null) {
                 baseScore = aiScore;
@@ -73,6 +74,10 @@ public class OfferScoringFacade {
                 .offerVector(offerVector)
                 .isRejected(false)
                 .build();
+    }
+
+    private double normalizeSemanticThreshold(double configuredThreshold) {
+        return configuredThreshold <= 1.0 ? configuredThreshold * 100.0 : configuredThreshold;
     }
 
     @lombok.Builder

@@ -3,6 +3,7 @@ package com.workdone.backend.orchestration;
 import com.workdone.backend.analysis.MatchingBand;
 import com.workdone.backend.analysis.OfferClassificationService;
 import com.workdone.backend.analysis.OfferEmbeddingService;
+import com.workdone.backend.analysis.DynamicConfigService;
 import com.workdone.backend.config.WorkDoneProperties;
 import com.workdone.backend.ingestion.JobProvider;
 import com.workdone.backend.ingestion.JobSearchParametersProvider;
@@ -41,6 +42,7 @@ public class OfferIngestionOrchestrator {
     private final WorkDoneProperties properties;
     private final OfferEmbeddingService embeddingService;
     private final JobSearchParametersProvider searchParametersProvider;
+    private final DynamicConfigService dynamicConfigService;
 
     private final AtomicBoolean isIngestionRunning = new AtomicBoolean(false);
 
@@ -53,6 +55,8 @@ public class OfferIngestionOrchestrator {
 
         int totalFound = 0;
         int totalNew = 0;
+        int instantOffersSent = 0;
+        JobOfferRecord bestOfferThisRun = null;
 
         try {
             log.info("🚀 [INGESTION] Startujemy...");
@@ -98,7 +102,17 @@ public class OfferIngestionOrchestrator {
                             float[] vector = (offerVectors.size() > i) ? offerVectors.get(i) : null;
                             
                             try {
-                                offerProcessor.processOffer(offer, candidateVector, vector);
+                                OfferProcessor.ProcessingResult result = offerProcessor.processOffer(offer, candidateVector, vector);
+                                if (!result.processed()) {
+                                    continue;
+                                }
+                                totalNew++;
+                                if (result.band() == MatchingBand.INSTANT) {
+                                    instantOffersSent++;
+                                }
+                                if (bestOfferThisRun == null || result.offer().priorityScore() > bestOfferThisRun.priorityScore()) {
+                                    bestOfferThisRun = result.offer();
+                                }
                                 totalNew++;
                             } catch (ObjectOptimisticLockingFailureException e) {
                                 log.warn("🔄 Optymistyczna blokada dla: {}", offer.title());
@@ -111,10 +125,29 @@ public class OfferIngestionOrchestrator {
                     }
                 }
             }
+            sendBestOfferFallbackIfNeeded(instantOffersSent, bestOfferThisRun);
             log.info("🏁 [INGESTION] Koniec. Znaleziono łącznie: {}, Przetworzono nowych: {}", totalFound, totalNew);
         } finally {
             isIngestionRunning.set(false);
         }
+    }
+
+    private void sendBestOfferFallbackIfNeeded(int instantOffersSent, JobOfferRecord bestOfferThisRun) {
+        if (!dynamicConfigService.isBestOfferFallbackEnabled()) {
+            return;
+        }
+        if (instantOffersSent > 0) {
+            return;
+        }
+        if (bestOfferThisRun == null) {
+            log.info("ℹ️ Best-offer fallback włączony, ale brak ofert do wysłania po tym skanie.");
+            return;
+        }
+
+        notifier.sendInstant(bestOfferThisRun);
+        log.info("🏆 Wysłano najlepszą ofertę jako fallback po skanie: {} ({})",
+                bestOfferThisRun.title(),
+                String.format("%.1f", bestOfferThisRun.priorityScore()));
     }
 
     /**

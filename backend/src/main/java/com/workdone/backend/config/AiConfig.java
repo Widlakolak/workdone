@@ -10,9 +10,6 @@ import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.ai.openai.OpenAiEmbeddingModel;
 import org.springframework.ai.openai.api.OpenAiApi;
-import org.springframework.ai.document.Document;
-import org.springframework.ai.embedding.EmbeddingRequest;
-import org.springframework.ai.embedding.EmbeddingResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -79,45 +76,5 @@ public class AiConfig {
                 .token(apiKey)
                 .clientName("workdone-backend")
                 .build();
-    }
-
-    @Bean
-    @Primary
-    @Qualifier("fallbackEmbeddingModel")
-    public EmbeddingModel fallbackEmbeddingModel(
-            @Qualifier("cohereAiEmbeddingModel") EmbeddingModel primaryModel,
-            @Qualifier("openAiEmbeddingModel") EmbeddingModel fallbackModel) {
-        
-        return new EmbeddingModel() {
-            @Override
-            public float[] embed(String text) {
-                try {
-                    return primaryModel.embed(text);
-                } catch (Exception e) {
-                    log.warn("⚠️ Cohere embedding failed, falling back to OpenAI. Reason: {}", e.getMessage());
-                    return fallbackModel.embed(text);
-                }
-            }
-
-            @Override
-            public float[] embed(Document document) {
-                try {
-                    return primaryModel.embed(document);
-                } catch (Exception e) {
-                    log.warn("⚠️ Cohere embedding (document) failed, falling back to OpenAI. Reason: {}", e.getMessage());
-                    return fallbackModel.embed(document);
-                }
-            }
-
-            @Override
-            public EmbeddingResponse call(EmbeddingRequest request) {
-                try {
-                    return primaryModel.call(request);
-                } catch (Exception e) {
-                    log.warn("⚠️ Cohere embedding (batch) failed, falling back to OpenAI. Reason: {}", e.getMessage());
-                    return fallbackModel.call(request);
-                }
-            }
-        };
     }
 }

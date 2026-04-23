@@ -30,6 +30,7 @@ public class DynamicConfigService {
     private List<String> mustHaveKeywords;
     private List<LocationPolicy> locationPolicies = new ArrayList<>();
     private boolean allowRemoteSearch;
+    private boolean bestOfferFallbackEnabled;
     private String preferredSeniority;
 
     public DynamicConfigService(WorkDoneProperties properties, @Lazy CandidateProfileService profileService) {
@@ -46,6 +47,7 @@ public class DynamicConfigService {
         this.mustHaveKeywords = new ArrayList<>(properties.matching() != null ? properties.matching().mustHaveKeywords() : List.of());
         this.preferredSeniority = "junior";
         this.allowRemoteSearch = properties.search() == null || properties.search().allowRemote();
+        this.bestOfferFallbackEnabled = false;
 
         // Domyślna lokalizacja z propertiesów jako pierwsza polityka (akceptujemy wszystko)
         String defaultLoc = properties.search() != null ? properties.search().defaultLocation() : "Poland";
@@ -74,9 +76,15 @@ public class DynamicConfigService {
                 case "instant": this.instantThreshold = Double.parseDouble(value); break;
                 case "digest": this.digestThreshold = Double.parseDouble(value); break;
                 case "archive": this.archiveThreshold = Double.parseDouble(value); break;
-                case "musthave": this.mustHaveKeywords = List.of(value.split(",")); break;
+                case "musthave":
+                    this.mustHaveKeywords = List.of(value.split(",")).stream()
+                            .map(String::trim)
+                            .filter(keyword -> !keyword.isBlank())
+                            .toList();
+                    break;
                 case "location": parseAndAddLocation(value); break;
                 case "remote": this.allowRemoteSearch = Boolean.parseBoolean(value); break;
+                case "best_offer_fallback": this.bestOfferFallbackEnabled = Boolean.parseBoolean(value); break;
                 case "seniority": this.preferredSeniority = value; break;
                 case "clear_locations": this.locationPolicies.clear(); break;
                 default: return "❌ Nieznany parametr: " + param;
@@ -115,9 +123,11 @@ public class DynamicConfigService {
                 - Semantic Threshold: %s%%
                 - Must-Have Keywords: %s
                 - Allow Remote Search: %s
+                - Best Offer Fallback: %s
                 - Preferred Seniority: %s
                 - Location Policies:
                 %s
+                ""\".formatted(semanticThreshold, mustHaveKeywords, allowRemoteSearch, bestOfferFallbackEnabled, preferredSeniority, policies);
                 """.formatted(semanticThreshold, mustHaveKeywords, allowRemoteSearch, preferredSeniority, policies);
     }
 }

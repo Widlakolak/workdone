@@ -48,11 +48,18 @@ public class DiscordInteractionService {
                         return "📨 Wysyłam " + pendingOffers.size() + " ofert do decyzji...";
                     }
                     case "refresh_cv" -> {
-                        profileService.refreshProfile();
+                        boolean refreshed = profileService.refreshProfile();
+                        if (!refreshed) {
+                            return "❌ Nie udało się odświeżyć CV. Sprawdź logi backendu (np. limit API / quota).";
+                        }
                         return "✅ CV przeanalizowane ponownie. Seniority: " + profileService.getSeniority();
                     }
                     case "use_cv_skills" -> {
-                        var skills = String.join(",", profileService.getSuggestedKeywords());
+                        var keywords = profileService.getSuggestedKeywords();
+                        if (keywords == null || keywords.isEmpty()) {
+                            return "❌ Brak słów kluczowych z CV. Najpierw kliknij „Odśwież CV”, potem spróbuj ponownie.";
+                        }
+                        var skills = String.join(",", keywords);
                         dynamicConfig.updateConfig("musthave", skills);
                         return "✅ Aktywowano słowa kluczowe z CV jako Must-Have: " + skills;
                     }
@@ -97,6 +104,7 @@ public class DiscordInteractionService {
                 ⚙️ **Konfiguracja (Parametry):**
                 - `semantic|0.x` - próg dopasowania AI
                 - `seniority|level` - junior/mid/senior
+                - `best_offer_fallback|true/false` - wyślij najlepszą ofertę po skanie, gdy brak INSTANT
                 - `location|city:R:H:O:days` - dodaj miasto
                 - `clear_locations` - usuń wszystkie miasta
                 """;
