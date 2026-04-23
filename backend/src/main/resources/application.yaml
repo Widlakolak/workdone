@@ -71,15 +71,18 @@ workdone:
     zone-id: Europe/Warsaw
   discord:
     public-key: ${DISCORD_PUBLIC_KEY}
-    instant: { enabled: false, url: "" }
-    digest: { enabled: false, url: "" }
+    instant:
+      enabled: ${DISCORD_INSTANT_ENABLED:true}
+      url: ${DISCORD_INSTANT_URL:}
+    digest:
+      enabled: ${DISCORD_DIGEST_ENABLED:true}
+      url: ${DISCORD_DIGEST_URL:}
   providers:
     rss:
       enabled: true
       sources:
         - name: "RemoteOK"
-          # Dynamiczne: w kodzie trzeba będzie podmieniać 'java' na skill z CV
-          url: "https://remoteok.com/remote-java-jobs.rss" 
+          url: "https://remoteok.com/remote-java-jobs.rss"
         - name: "WeWorkRemotely"
           url: "https://weworkremotely.com/categories/remote-back-end-programming-jobs.rss"
     remotive:
@@ -91,8 +94,7 @@ workdone:
       api-key: ${JOOBLE_API_KEY}
       base-url: https://jooble.org/api
       filters:
-        # To będzie nadpisywane przez MatchingService na podstawie CV
-        keywords: "java, spring boot, sql" 
+        keywords: "java, spring boot, sql"
         location: "Łódź"
         radius: "50"
         allow-remote: true
@@ -102,6 +104,6 @@ workdone:
       base-url: "https://jobicy.com/api/v2/remote-jobs"
       filters:
         count: 50
-        geo: "" # Wyciągane z profilu (np. poland, usa)
+        geo: ""
         industry: "engineering" 
-        tag: "java, spring boot" # Główne skille z CV
+        tag: "java, spring boot"
