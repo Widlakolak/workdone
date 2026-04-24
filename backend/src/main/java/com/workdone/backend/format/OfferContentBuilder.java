@@ -16,12 +16,26 @@ public class OfferContentBuilder {
      * Skupiam się na kluczowych polach: tytuł, firma, miejsce i opis.
      */
     public String buildTechnicalContent(JobOfferRecord offer) {
-        return String.format("%s %s %s %s",
-                offer.title(),
-                offer.companyName(),
-                offer.location(),
-                offer.rawDescription()
+        // Dodanie etykiet (Role, Company itp.) pomaga modelowi lepiej "zrozumieć" strukturę.
+        // Używamy średnika jako separatora, który jest dobrze rozumiany przez tokenizery.
+        return String.format("Role: %s; Company: %s; Location: %s; Description: %s",
+                normalize(offer.title()),
+                normalize(offer.companyName()),
+                normalize(offer.location()),
+                cleanDescription(offer.rawDescription())
         );
+    }
+
+    private String normalize(String input) {
+        if (input == null) return "";
+        return input.trim().replaceAll("\\s+", " ");
+    }
+
+    private String cleanDescription(String description) {
+        if (description == null) return "";
+        // Opcjonalnie: Usuwanie tagów HTML, jeśli mogą się pojawić
+        String noHtml = description.replaceAll("<[^>]*>", " ");
+        return normalize(noHtml);
     }
 
     /**

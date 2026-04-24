@@ -1,28 +1,29 @@
 spring:
+  datasource:
+    url: jdbc:h2:mem:workdone-test;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
   jpa:
-    enabled: false
+    hibernate:
+      ddl-auto: none
   flyway:
     enabled: false
-  autoconfigure:
-    exclude:
-      - org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
-      - org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration
-      - org.springframework.boot.autoconfigure.jdbc.DataSourceTransactionManagerAutoConfiguration
-      - org.springframework.boot.autoconfigure.flyway.FlywayAutoConfiguration
-  
   ai:
+    vectorstore:
+      pgvector:
+        initialize-schema: false
     openai:
-      api-key: ${OPENAI_API_KEY:dummy}
+      chat:
+        enabled: false
     google:
       genai:
-        api-key: ${GEMINI_API_KEY:dummy}
-    groq:
-      api-key: ${GROQ_API_KEY:dummy}
-      base-url: https://api.groq.com/openai
-      model: llama-3.3-70b-versatile
-    cohere:
-      api-key: ${COHERE_API_KEY:dummy}
+        chat:
+          enabled: false
 
 workdone:
+  providers:
+    jooble:
+      enabled: false
   discord:
-    public-key: ${DISCORD_PUBLIC_KEY:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef}
+    public-key: 1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef
