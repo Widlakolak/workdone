@@ -10,8 +10,13 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
 import jakarta.annotation.PostConstruct;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.regex.Pattern;
 
 /**
  * Serwis od powiadomień. 
@@ -22,10 +27,15 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class DiscordNotifier {
 
+    private static final Duration AI_ALERT_COOLDOWN = Duration.ofMinutes(15);
+    private static final Pattern OFFER_ERROR_PATTERN = Pattern.compile("offer '.*?', error:");
+    private static final Pattern NUMERIC_PATTERN = Pattern.compile("\\b\\d+(?:\\.\\d+)?(?:ms|s)?\\b");
+
     private final WorkDoneProperties properties;
     private final OfferContentBuilder contentBuilder;
 
     private RestClient client;
+    private final ConcurrentMap<String, Instant> aiAlertCooldowns = new ConcurrentHashMap<>();
 
     @PostConstruct
     public void init() {
@@ -45,6 +55,10 @@ public class DiscordNotifier {
     }
 
     public void sendAiAlert(String message) {
+        if (!shouldSendAiAlert(message)) {
+            log.info("⏱️ Pomijam powtarzający się alert AI (cooldown): {}", normalizeAiAlertMessage(message));
+            return;
+        }
         postMessage(properties.discord().instant().url(), Map.of("content", "⚠️ **System Alert:** " + message));
     }
 
@@ -132,5 +146,28 @@ public class DiscordNotifier {
 
     private boolean isBlank(String value) {
         return value == null || value.isBlank();
+    }
+
+    private boolean shouldSendAiAlert(String message) {
+        String normalized = normalizeAiAlertMessage(message);
+        Instant now = Instant.now();
+        Instant previous = aiAlertCooldowns.put(normalized, now);
+        if (previous == null) {
+            return true;
+        }
+        if (Duration.between(previous, now).compareTo(AI_ALERT_COOLDOWN) >= 0) {
+            return true;
+        }
+        aiAlertCooldowns.put(normalized, previous);
+        return false;
+    }
+
+    private String normalizeAiAlertMessage(String message) {
+        if (message == null || message.isBlank()) {
+            return "empty";
+        }
+        String normalized = OFFER_ERROR_PATTERN.matcher(message).replaceAll("offer '<hidden>', error:");
+        normalized = NUMERIC_PATTERN.matcher(normalized).replaceAll("<n>");
+        return normalized.trim();
     }
 }

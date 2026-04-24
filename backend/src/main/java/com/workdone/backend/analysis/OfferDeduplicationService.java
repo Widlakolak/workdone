@@ -1,5 +1,6 @@
 package com.workdone.backend.analysis;
 
+import com.workdone.backend.config.FallbackEmbeddingModel;
 import com.workdone.backend.storage.OfferVectorStore;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -13,9 +14,14 @@ import java.util.List;
 public class OfferDeduplicationService {
 
     private final OfferVectorStore vectorStore;
+    private final FallbackEmbeddingModel fallbackEmbeddingModel;
 
     public boolean isDuplicate(float[] embedding) {
         if (embedding == null) {
+            return false;
+        }
+        if (fallbackEmbeddingModel.usedLocalFallbackInCurrentThread()) {
+            log.warn("⚠️ Pomijam deduplikację wektorową: aktywny lokalny embedding awaryjny (niska precyzja).");
             return false;
         }
 

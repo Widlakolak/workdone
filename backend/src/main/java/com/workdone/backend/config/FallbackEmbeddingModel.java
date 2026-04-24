@@ -15,6 +15,7 @@ import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 @Slf4j
 @Component
@@ -25,6 +26,7 @@ public class FallbackEmbeddingModel implements EmbeddingModel {
 
     private final EmbeddingModel primaryModel;
     private final EmbeddingModel fallbackModel;
+    private final ThreadLocal<AtomicBoolean> localFallbackUsed = ThreadLocal.withInitial(() -> new AtomicBoolean(false));
 
     public FallbackEmbeddingModel(
             @Qualifier("cohereAiEmbeddingModel") EmbeddingModel primaryModel,
@@ -36,14 +38,19 @@ public class FallbackEmbeddingModel implements EmbeddingModel {
     @Override
     public float[] embed(String text) {
         try {
-            return primaryModel.embed(text);
+            float[] result = primaryModel.embed(text);
+            markLocalFallbackUsed(false);
+            return result;
         } catch (Exception e) {
             log.warn("⚠️ Główny model embeddingu (String) zawiódł ({}), próbuję fallback...", e.getMessage());
             try {
-                return fallbackModel.embed(text);
+                float[] result = fallbackModel.embed(text);
+                markLocalFallbackUsed(false);
+                return result;
             } catch (Exception fallbackException) {
                 log.error("❌ Fallback embeddingu (String) też zawiódł ({}). Używam lokalnego embeddingu awaryjnego.",
                         fallbackException.getMessage());
+                markLocalFallbackUsed(true);
                 return localEmbed(text);
             }
         }
@@ -52,24 +59,33 @@ public class FallbackEmbeddingModel implements EmbeddingModel {
     @Override
     public float[] embed(Document document) {
         try {
-            return primaryModel.embed(document);
+            float[] result = primaryModel.embed(document);
+            markLocalFallbackUsed(false);
+            return result;
         } catch (Exception e) {
             log.warn("⚠️ Główny model embeddingu (Document) zawiódł ({}), próbuję fallback...", e.getMessage());
-            return fallbackModel.embed(document);
+            float[] result = fallbackModel.embed(document);
+            markLocalFallbackUsed(false);
+            return result;
         }
     }
 
     @Override
     public List<float[]> embed(List<String> texts) {
         try {
-            return primaryModel.embed(texts);
+            List<float[]> result = primaryModel.embed(texts);
+            markLocalFallbackUsed(false);
+            return result;
         } catch (Exception e) {
             log.warn("⚠️ Główny model embeddingu (List) zawiódł ({}), próbuję fallback...", e.getMessage());
             try {
-                return fallbackModel.embed(texts);
+                List<float[]> result = fallbackModel.embed(texts);
+                markLocalFallbackUsed(false);
+                return result;
             } catch (Exception fallbackException) {
                 log.error("❌ Fallback embeddingu (List) też zawiódł ({}). Używam lokalnych embeddingów awaryjnych.",
                         fallbackException.getMessage());
+                markLocalFallbackUsed(true);
                 return texts.stream().map(this::localEmbed).toList();
             }
         }
@@ -78,14 +94,19 @@ public class FallbackEmbeddingModel implements EmbeddingModel {
     @Override
     public EmbeddingResponse call(EmbeddingRequest request) {
         try {
-            return primaryModel.call(request);
+            EmbeddingResponse response = primaryModel.call(request);
+            markLocalFallbackUsed(false);
+            return response;
         } catch (Exception e) {
             log.warn("⚠️ Główny model embeddingu (call) zawiódł ({}), próbuję fallback...", e.getMessage());
             try {
-                return fallbackModel.call(request);
+                EmbeddingResponse response = fallbackModel.call(request);
+                markLocalFallbackUsed(false);
+                return response;
             } catch (Exception fallbackException) {
                 log.error("❌ Fallback embeddingu (call) też zawiódł ({}). Przechodzę na lokalne embeddingi awaryjne.",
                         fallbackException.getMessage());
+                markLocalFallbackUsed(true);
                 List<String> instructions = request.getInstructions();
                 if (instructions == null || instructions.isEmpty()) {
                     return new EmbeddingResponse(List.of());
@@ -104,6 +125,10 @@ public class FallbackEmbeddingModel implements EmbeddingModel {
     @Override
     public int dimensions() {
         return primaryModel.dimensions();
+    }
+
+    public boolean usedLocalFallbackInCurrentThread() {
+        return localFallbackUsed.get().get();
     }
 
     private float[] localEmbed(String text) {
@@ -133,5 +158,9 @@ public class FallbackEmbeddingModel implements EmbeddingModel {
             vector[i] = vector[i] / norm;
         }
         return vector;
+    }
+
+    private void markLocalFallbackUsed(boolean value) {
+        localFallbackUsed.get().set(value);
     }
 }

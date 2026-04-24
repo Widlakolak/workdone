@@ -24,6 +24,7 @@ class FallbackEmbeddingModelTest {
 
         assertThat(result).containsExactly(1.0f, 2.0f);
         Mockito.verify(fallbackModel).embed("java spring");
+        assertThat(model.usedLocalFallbackInCurrentThread()).isFalse();
     }
 
     @Test
@@ -55,6 +56,7 @@ class FallbackEmbeddingModelTest {
 
         assertThat(result).hasSize(1024);
         assertThat(result).isNotNull();
+        assertThat(model.usedLocalFallbackInCurrentThread()).isTrue();
         boolean hasPositiveValue = false;
         for (float value : result) {
             if (value > 0f) {
@@ -80,5 +82,6 @@ class FallbackEmbeddingModelTest {
         assertThat(result).hasSize(2);
         assertThat(result.get(0)).hasSize(1024);
         assertThat(result.get(1)).hasSize(1024);
+        assertThat(model.usedLocalFallbackInCurrentThread()).isTrue();
     }
 }
