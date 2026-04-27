@@ -100,7 +100,7 @@ public class OfferIngestionOrchestrator {
             List<OfferProcessor.ProcessingResult> finalResults = candidates.stream()
                     .sorted(Comparator.comparing((OfferProcessor.ProcessingResult r) -> r.offer().matchingScore()).reversed())
                     .map(res -> {
-                        var enriched = offerProcessor.enrichWithAi(res.offer(), candidateVector);
+                        var enriched = offerProcessor.enrichWithAi(res.offer(), candidateVector, res.vector());
 
                         // Zliczanie statystyk pod "Lejek"
                         if (enriched.source() == AnalysisSource.AI) metrics.aiCalls++;

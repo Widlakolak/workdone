@@ -88,11 +88,10 @@ class OfferIngestionOrchestratorFallbackTest {
 
         // Mockujemy nową logikę OfferProcessor
         when(offerProcessor.preProcess(eq(rawOffer), any(), any()))
-                .thenReturn(new OfferProcessor.ProcessingResult(preProcessedOffer, null, true, null));
+                .thenReturn(new OfferProcessor.ProcessingResult(preProcessedOffer, null, true, null, new float[]{0.1f}));
 
-        when(offerProcessor.enrichWithAi(eq(preProcessedOffer), any()))
-                .thenReturn(new OfferProcessor.ProcessingResult(finalOffer, MatchingBand.DIGEST, true, OfferAnalysisFacade.AnalysisSource.AI));
-
+        when(offerProcessor.enrichWithAi(eq(preProcessedOffer), any(), any()))
+                .thenReturn(new OfferProcessor.ProcessingResult(finalOffer, MatchingBand.DIGEST, true, OfferAnalysisFacade.AnalysisSource.AI, new float[]{0.1f}));
         when(dynamicConfigService.isBestOfferFallbackEnabled()).thenReturn(true);
 
         orchestrator.runIngestion();

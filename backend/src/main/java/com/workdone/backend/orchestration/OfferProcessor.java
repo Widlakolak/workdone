@@ -52,11 +52,11 @@ public class OfferProcessor {
             log.error("❌ Błąd zapisu stagingu dla {}: {}", enriched.title(), e.getMessage());
         }
 
-        return new ProcessingResult(enriched, null, true, null);
+        return new ProcessingResult(enriched, null, true, null, offerVector);
     }
 
     // Faza 2: Głęboka analiza (AI) + Klasyfikacja + Powiadomienie
-    public ProcessingResult enrichWithAi(JobOfferRecord offer, float[] candidateVector) {
+    public ProcessingResult enrichWithAi(JobOfferRecord offer, float[] candidateVector, float[] offerVector) {
         AnalysisResponse response = aiAnalysisFacade.performDeepAnalysis(offer, offer.matchingScore());
 
         double finalScore = (response.score() != null) ? response.score() : offer.matchingScore();
@@ -76,17 +76,18 @@ public class OfferProcessor {
             notifier.sendInstant(finalOffer);
         }
 
-        return new ProcessingResult(finalOffer, band, true, response.source());
+        return new ProcessingResult(finalOffer, band, true, response.source(), offerVector);
     }
 
     public record ProcessingResult(
             JobOfferRecord offer,
             MatchingBand band,
             boolean processed,
-            AnalysisSource source
+            AnalysisSource source,
+            float[] vector
     ) {
         public static ProcessingResult skipped() {
-            return new ProcessingResult(null, null, false, null);
+            return new ProcessingResult(null, null, false, null, null);
         }
     }
 }

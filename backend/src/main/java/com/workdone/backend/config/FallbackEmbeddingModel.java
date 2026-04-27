@@ -2,7 +2,6 @@ package com.workdone.backend.config;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.document.Document;
-import org.springframework.ai.embedding.Embedding;
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.ai.embedding.EmbeddingResponse;
 import org.springframework.ai.embedding.EmbeddingRequest;
@@ -12,7 +11,6 @@ import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -71,7 +69,7 @@ public class FallbackEmbeddingModel implements EmbeddingModel {
             float[] result = cohereModel.embed(document);
             markLocalFallbackUsed(false);
             return result;
-        } catch (Exception e) {
+        } catch (Exception e1) {
             log.warn("⚠️ Cohere (Document) zawiódł, przechodzę na OpenAI...");
             try {
                 float[] result = openAiModel.embed(document);
@@ -79,6 +77,7 @@ public class FallbackEmbeddingModel implements EmbeddingModel {
                 return result;
             } catch (Exception e2) {
                 log.warn("⚠️ OpenAI (Document) zawiódł, przechodzę na Local Bean...");
+                markLocalFallbackUsed(true);
                 return localModel.embed(document);
             }
         }
@@ -90,7 +89,7 @@ public class FallbackEmbeddingModel implements EmbeddingModel {
             List<float[]> result = cohereModel.embed(texts);
             markLocalFallbackUsed(false);
             return result;
-        } catch (Exception e) {
+        } catch (Exception e1) {
             log.warn("⚠️ Cohere (List) zawiódł, próbuję OpenAI...");
             try {
                 List<float[]> result = openAiModel.embed(texts);
@@ -99,6 +98,7 @@ public class FallbackEmbeddingModel implements EmbeddingModel {
             } catch (Exception e2) {
                 log.warn("⚠️ OpenAI (List) zawiódł, próbuję Local Bean...");
                 try {
+                    markLocalFallbackUsed(true);
                     return localModel.embed(texts);
                 } catch (Exception e3) {
                     log.error("❌ Fallback (List) zawiódł całkowicie.");
@@ -112,13 +112,18 @@ public class FallbackEmbeddingModel implements EmbeddingModel {
     @Override
     public EmbeddingResponse call(EmbeddingRequest request) {
         try {
-            return cohereModel.call(request);
-        } catch (Exception e) {
+            EmbeddingResponse response = cohereModel.call(request);
+            markLocalFallbackUsed(false);
+            return response;
+        } catch (Exception e1) {
             log.warn("⚠️ Cohere (call) zawiódł, próbuję OpenAI...");
             try {
-                return openAiModel.call(request);
+                EmbeddingResponse response = openAiModel.call(request);
+                markLocalFallbackUsed(false);
+                return response;
             } catch (Exception e2) {
                 log.warn("⚠️ OpenAI (call) zawiódł, próbuję Local Bean...");
+                markLocalFallbackUsed(true);
                 return localModel.call(request);
             }
         }
@@ -133,7 +138,6 @@ public class FallbackEmbeddingModel implements EmbeddingModel {
         return localFallbackUsed.get().get();
     }
 
-    // Twoja oryginalna metoda "bezpieczeństwa"
     private float[] localEmbed(String text) {
         float[] vector = new float[LOCAL_FALLBACK_DIMENSIONS];
         if (text == null || text.isBlank()) {

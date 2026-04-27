@@ -5,6 +5,7 @@ import com.workdone.backend.format.OfferContentBuilder;
 import com.workdone.backend.model.JobOfferRecord;
 import com.workdone.backend.notification.DiscordNotifier;
 import com.workdone.backend.profile.service.CandidateProfileService;
+import com.workdone.backend.storage.JdbcEmbeddingCacheStore;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -33,6 +34,7 @@ class PipelineFallbackIntegrationTest {
     @Mock private WorkDoneProperties properties;
     @Mock private DiscordNotifier discordNotifier;
     @Mock private OfferContentBuilder contentBuilder;
+    @Mock private JdbcEmbeddingCacheStore embeddingCache;
 
     @BeforeEach
     void setUp() {
@@ -43,7 +45,7 @@ class PipelineFallbackIntegrationTest {
         scoringService.init();
 
         // Teraz OfferEmbeddingService przyjmuje jeden model (zazwyczaj fallbackowy) i builder
-        embeddingService = new OfferEmbeddingService(cohereModel, contentBuilder);
+        embeddingService = new OfferEmbeddingService(cohereModel, contentBuilder, embeddingCache);
     }
 
     @Test
