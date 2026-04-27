@@ -38,14 +38,18 @@ POST /api/admin/test/show-panel
 CV files -> merge -> embedding + parsing (keywords/seniority/location)
 
 Scheduler/manual trigger ->
-  Ingestion (providers x search contexts) ->
-  Enrich + dedup ->
-  Must-Have + scoring semantyczny ->
-  (opcjonalnie) Deep AI scoring ->
-  Klasyfikacja (INSTANT / DIGEST / ARCHIVE) ->
-  Zapis oferty ->
-  Discord notify:
-    - zawsze: INSTANT (bez zmian)
+  Ingestion (zbieranie ze wszystkich źródeł naraz) ->
+  Pre-processing (Staging):
+    - Must-Have filtering
+    - Semantic Scoring (Cosine Similarity)
+    - **Zapis wszystkich "Must-Have OK" do bazy (Status: NEW)**
+  Selekcja TOP-N:
+    - Sortowanie całego batcha po dopasowaniu semantycznym
+    - **Deep AI Scoring (tylko dla Top 3 najlepszych - oszczędność tokenów)**
+    - AI Cache (pomijanie analizy, jeśli fingerprint już istnieje w DB)
+  Klasyfikacja & Notify:
+    - INSTANT (wysyłane natychmiast)
+    - Daily Digest (AI Blessed + Top 10 Best of Rest)
     - opcjonalnie: best-offer fallback, jeśli w skanie nie było INSTANT
 ```
 
@@ -68,28 +72,33 @@ flowchart LR
     F --> G[Enrich Data]
     G --> H[Deduplication]
 
-    %% ===== MATCHING =====
+    %% ===== MATCHING (FAZA 1) =====
     H --> I[Must-Have Filter]
-    I --> J[Semantic Scoring]
+    I --> J[Semantic Scoring<br/>Cosine Similarity]
+    
+    %% ===== STAGING =====
+    J --> J1[(DB Staging<br/>Status: NEW)]
+    
+    %% ===== SELEKCJA (FAZA 2) =====
+    J1 --> J2[Sort by Score<br/>& Select Top-N]
 
-    %% ===== OPTIONAL AI =====
-    J --> K{Deep AI Scoring?}
-    K -- YES --> L[Multi-Model AI Scoring]
+    %% ===== INTELIGENTNE AI =====
+    J2 --> K{Deep AI Analysis?}
+    K -- YES --> L1{AI Cache Hit?}
+    L1 -- NO --> L2[Multi-Model LLM<br/>Scoring & Reasoning]
+    L1 -- YES --> M
+    L2 --> M[Final Score]
     K -- NO --> M
-
-    L --> M[Final Score]
 
     %% ===== CLASSIFICATION =====
     M --> N[Classification<br/>INSTANT / DIGEST / ARCHIVE]
 
-    %% ===== STORAGE =====
-    N --> O[Persist Offer]
-
-    %% ===== NOTIFICATION =====
+    %% ===== FINALIZACJA =====
+    N --> O[(DB Update<br/>Status: ANALYZED)]
     O --> P[Discord Notify]
 
-    %% ===== PROFILE LINK =====
-    E -. used in .-> J
+    %% ===== POWIĄZANIE PROFILU =====
+    E -. used for .-> J
 ```
 ```mermaid
 flowchart TD
@@ -155,6 +164,16 @@ Konfiguracja w `application.yaml` (`workdone.scheduling.*`).
 3. **orchestration/** – pipeline end-to-end i harmonogram
 4. **interaction/** – endpointy API i obsługa kliknięć Discord
 5. **storage/** – zapis ofert + wektory
+
+---
+
+## 🛡️ AI Token Protection & Performance
+
+System został zoptymalizowany pod kątem limitów API (np. Groq/OpenAI):
+- **Batch Selection**: AI nie jest odpalane dla każdej oferty. System wybiera tylko 2-3 najlepsze oferty z danego runu.
+- **AI Result Cache**: Wyniki analizy AI są zapisywane w bazie danych po `fingerprint`. Raz oceniona oferta nigdy nie zużyje tokenów ponownie.
+- **Smart Rate Limiting**: System inteligentnie parsuje odpowiedzi 429 (Rate Limit) i blokuje dany model na dokładnie taki czas, o jaki prosi dostawca (obsługa h/m/s).
+- **Staging Area**: Wszystkie oferty spełniające bazowe kryteria (Must-Have) trafiają do bazy przed analizą AI, budując bazę wiedzy.
 
 ---
 

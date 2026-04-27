@@ -169,20 +169,26 @@ public class OfferScoringService {
             return DEFAULT_RATE_LIMIT_COOLDOWN;
         }
 
-        Matcher millisMatcher = RETRY_MILLIS_PATTERN.matcher(message);
-        if (millisMatcher.find()) {
-            double millis = Double.parseDouble(millisMatcher.group(1));
-            return Duration.ofMillis(Math.max(200L, (long) millis));
-        }
+        Matcher matcher = RETRY_TIME_PATTERN.matcher(message);
+        if (matcher.find()) {
+            long hours = matcher.group(1) != null ? Long.parseLong(matcher.group(1)) : 0;
+            long minutes = matcher.group(2) != null ? Long.parseLong(matcher.group(2)) : 0;
+            double seconds = matcher.group(3) != null ? Double.parseDouble(matcher.group(3)) : 0;
 
-        Matcher secondsMatcher = RETRY_SECONDS_PATTERN.matcher(message);
-        if (secondsMatcher.find()) {
-            double seconds = Double.parseDouble(secondsMatcher.group(1));
-            return Duration.ofMillis(Math.max(1000L, (long) (seconds * 1000L)));
+            // Przeliczamy wszystko na milisekundy
+            long totalMillis = (long) ((hours * 3600 + minutes * 60 + seconds) * 1000);
+
+            // Zwracamy wyliczony czas + 5 sekund marginesu bezpieczeństwa
+            return Duration.ofMillis(Math.max(1000L, totalMillis + 5000L));
         }
 
         return DEFAULT_RATE_LIMIT_COOLDOWN;
     }
+
+    private static final Pattern RETRY_TIME_PATTERN = Pattern.compile(
+            "try again in (?:(\\d+)h)?(?:(\\d+)m)?(?:(\\d+(?:\\.\\d+)?)s)?",
+            Pattern.CASE_INSENSITIVE
+    );
 
     private void putProviderOnCooldown(String providerName, Duration cooldown) {
         providerCooldownUntil.put(providerName, Instant.now().plus(cooldown));

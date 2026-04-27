@@ -29,10 +29,12 @@ public class CohereEmbeddingAdapter implements EmbeddingModel {
     private final CohereBatchClient batchClient;
     private final int maxBatchSize;
     private final CohereRateLimiter rateLimiter;
+    private final String model;
 
     @Autowired
     public CohereEmbeddingAdapter(
             Cohere cohere,
+            @Value("${workdone.ai.embedding.cohere.model:embed-multilingual-v3.0}") String model,
             @Value("${workdone.ai.cohere.max-batch-size:96}") int maxBatchSize,
             @Value("${workdone.ai.cohere.max-requests-per-minute:5}") int maxRequestsPerMinute
     ) {
@@ -40,7 +42,7 @@ public class CohereEmbeddingAdapter implements EmbeddingModel {
             @Override
             public List<float[]> embed(List<String> texts) {
                 var response = cohere.v2().embed(V2EmbedRequest.builder()
-                        .model("embed-multilingual-v3.0")
+                        .model(model)
                         .inputType(EmbedInputType.SEARCH_DOCUMENT)
                         .texts(texts)
                         .build());
@@ -59,11 +61,12 @@ public class CohereEmbeddingAdapter implements EmbeddingModel {
                         })
                         .orElseThrow(() -> new RuntimeException("Cohere returned no embeddings"));
             }
-        }, maxBatchSize, maxRequestsPerMinute, new ThreadSleeper());
+        }, model, maxBatchSize, maxRequestsPerMinute, new ThreadSleeper());
     }
 
-    CohereEmbeddingAdapter(CohereBatchClient batchClient, int maxBatchSize, int maxRequestsPerMinute, Sleeper sleeper) {
+    CohereEmbeddingAdapter(CohereBatchClient batchClient, String model, int maxBatchSize, int maxRequestsPerMinute, Sleeper sleeper) {
         this.batchClient = batchClient;
+        this.model = model;
         this.maxBatchSize = Math.max(1, Math.min(maxBatchSize, DEFAULT_MAX_BATCH_SIZE));
         this.rateLimiter = new CohereRateLimiter(maxRequestsPerMinute, sleeper);
     }

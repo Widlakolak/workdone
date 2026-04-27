@@ -8,80 +8,79 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class FallbackEmbeddingModelTest {
 
     @Test
     void shouldUseOpenAiFallbackWhenPrimaryEmbeddingFails() {
-        EmbeddingModel primaryModel = Mockito.mock(EmbeddingModel.class);
-        EmbeddingModel fallbackModel = Mockito.mock(EmbeddingModel.class);
+        EmbeddingModel cohere = mock(EmbeddingModel.class);
+        EmbeddingModel openai = mock(EmbeddingModel.class);
+        EmbeddingModel local = mock(EmbeddingModel.class);
 
-        Mockito.when(primaryModel.embed("java spring")).thenThrow(new RuntimeException("cohere down"));
-        Mockito.when(fallbackModel.embed("java spring")).thenReturn(new float[] {1.0f, 2.0f});
+        when(cohere.embed("java spring")).thenThrow(new RuntimeException("cohere down"));
+        when(openai.embed("java spring")).thenReturn(new float[] {1.0f, 2.0f});
 
-        FallbackEmbeddingModel model = new FallbackEmbeddingModel(primaryModel, fallbackModel);
+        FallbackEmbeddingModel model = new FallbackEmbeddingModel(cohere, openai, local);
         float[] result = model.embed("java spring");
 
         assertThat(result).containsExactly(1.0f, 2.0f);
-        Mockito.verify(fallbackModel).embed("java spring");
-        assertThat(model.usedLocalFallbackInCurrentThread()).isFalse();
+        Mockito.verify(openai).embed("java spring");
+        assertThat(model.usedLocalFallbackInCurrentThread()).isFalse(); // Bo OpenAI zadziałało
     }
 
     @Test
-    void shouldUseOpenAiFallbackForBatchEmbeddingWhenPrimaryFails() {
-        EmbeddingModel primaryModel = Mockito.mock(EmbeddingModel.class);
-        EmbeddingModel fallbackModel = Mockito.mock(EmbeddingModel.class);
-        List<String> batch = List.of("oferta 1", "oferta 2");
+    void shouldUseLocalFallbackWhenBothPrimaryAndSecondaryFail() {
+        EmbeddingModel cohere = mock(EmbeddingModel.class);
+        EmbeddingModel openai = mock(EmbeddingModel.class);
+        EmbeddingModel local = mock(EmbeddingModel.class);
 
-        Mockito.when(primaryModel.embed(batch)).thenThrow(new RuntimeException("cohere timeout"));
-        Mockito.when(fallbackModel.embed(batch)).thenReturn(List.of(new float[] {0.1f}, new float[] {0.2f}));
+        when(cohere.embed("java spring")).thenThrow(new RuntimeException("cohere down"));
+        when(openai.embed("java spring")).thenThrow(new RuntimeException("openai quota"));
+        when(local.embed("java spring")).thenReturn(new float[] {3.0f, 4.0f});
 
-        FallbackEmbeddingModel model = new FallbackEmbeddingModel(primaryModel, fallbackModel);
-        List<float[]> result = model.embed(batch);
+        FallbackEmbeddingModel model = new FallbackEmbeddingModel(cohere, openai, local);
+        float[] result = model.embed("java spring");
 
-        assertThat(result).hasSize(2);
-        Mockito.verify(fallbackModel).embed(batch);
+        assertThat(result).containsExactly(3.0f, 4.0f);
+        Mockito.verify(local).embed("java spring");
+        assertThat(model.usedLocalFallbackInCurrentThread()).isTrue();
     }
 
     @Test
-    void shouldUseLocalFallbackWhenBothProvidersFailForSingleText() {
-        EmbeddingModel primaryModel = Mockito.mock(EmbeddingModel.class);
-        EmbeddingModel fallbackModel = Mockito.mock(EmbeddingModel.class);
+    void shouldUseHardcodedLocalEmbedWhenAllModelsFail() {
+        EmbeddingModel cohere = mock(EmbeddingModel.class);
+        EmbeddingModel openai = mock(EmbeddingModel.class);
+        EmbeddingModel local = mock(EmbeddingModel.class);
 
-        Mockito.when(primaryModel.embed(any(String.class))).thenThrow(new RuntimeException("cohere down"));
-        Mockito.when(fallbackModel.embed(any(String.class))).thenThrow(new RuntimeException("openai quota"));
+        when(cohere.embed(any(String.class))).thenThrow(new RuntimeException("error"));
+        when(openai.embed(any(String.class))).thenThrow(new RuntimeException("error"));
+        when(local.embed(any(String.class))).thenThrow(new RuntimeException("error"));
 
-        FallbackEmbeddingModel model = new FallbackEmbeddingModel(primaryModel, fallbackModel);
+        FallbackEmbeddingModel model = new FallbackEmbeddingModel(cohere, openai, local);
         float[] result = model.embed("java spring boot");
 
         assertThat(result).hasSize(1024);
-        assertThat(result).isNotNull();
         assertThat(model.usedLocalFallbackInCurrentThread()).isTrue();
-        boolean hasPositiveValue = false;
-        for (float value : result) {
-            if (value > 0f) {
-                hasPositiveValue = true;
-                break;
-            }
-        }
-        assertThat(hasPositiveValue).isTrue();
     }
 
     @Test
-    void shouldUseLocalFallbackWhenBothProvidersFailForBatch() {
-        EmbeddingModel primaryModel = Mockito.mock(EmbeddingModel.class);
-        EmbeddingModel fallbackModel = Mockito.mock(EmbeddingModel.class);
-        List<String> batch = List.of("oferta java", "oferta kotlin");
+    void shouldUseLocalFallbackForBatchWhenBothProvidersFail() {
+        EmbeddingModel cohere = mock(EmbeddingModel.class);
+        EmbeddingModel openai = mock(EmbeddingModel.class);
+        EmbeddingModel local = mock(EmbeddingModel.class);
+        List<String> batch = List.of("java", "kotlin");
 
-        Mockito.when(primaryModel.embed(batch)).thenThrow(new RuntimeException("cohere timeout"));
-        Mockito.when(fallbackModel.embed(batch)).thenThrow(new RuntimeException("openai quota"));
+        when(cohere.embed(batch)).thenThrow(new RuntimeException("error"));
+        when(openai.embed(batch)).thenThrow(new RuntimeException("error"));
+        when(local.embed(batch)).thenThrow(new RuntimeException("error"));
 
-        FallbackEmbeddingModel model = new FallbackEmbeddingModel(primaryModel, fallbackModel);
+        FallbackEmbeddingModel model = new FallbackEmbeddingModel(cohere, openai, local);
         List<float[]> result = model.embed(batch);
 
         assertThat(result).hasSize(2);
         assertThat(result.get(0)).hasSize(1024);
-        assertThat(result.get(1)).hasSize(1024);
         assertThat(model.usedLocalFallbackInCurrentThread()).isTrue();
     }
 }

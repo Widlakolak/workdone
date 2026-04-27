@@ -47,7 +47,7 @@ public class DynamicConfigService {
         this.mustHaveKeywords = new ArrayList<>(properties.matching() != null ? properties.matching().mustHaveKeywords() : List.of());
         this.preferredSeniority = "junior";
         this.allowRemoteSearch = properties.search() == null || properties.search().allowRemote();
-        this.bestOfferFallbackEnabled = false;
+        this.bestOfferFallbackEnabled = true;
 
         // Domyślna lokalizacja z propertiesów jako pierwsza polityka (akceptujemy wszystko)
         String defaultLoc = properties.search() != null ? properties.search().defaultLocation() : "Poland";

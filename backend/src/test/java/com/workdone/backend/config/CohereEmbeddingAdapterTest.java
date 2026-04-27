@@ -19,7 +19,7 @@ class CohereEmbeddingAdapterTest {
             return texts.stream().map(text -> new float[] {text.length()}).toList();
         };
 
-        CohereEmbeddingAdapter adapter = new CohereEmbeddingAdapter(batchClient, 200, 5, millis -> {
+        CohereEmbeddingAdapter adapter = new CohereEmbeddingAdapter(batchClient, "embed-multilingual-v3.0", 200, 5, millis -> {
         });
 
         List<String> input = new ArrayList<>();
@@ -47,7 +47,7 @@ class CohereEmbeddingAdapterTest {
                 .map(text -> new float[] {1.0f})
                 .toList();
 
-        CohereEmbeddingAdapter adapter = new CohereEmbeddingAdapter(batchClient, 1, 120, sleeper);
+        CohereEmbeddingAdapter adapter = new CohereEmbeddingAdapter(batchClient, "embed-multilingual-v3.0", 1, 120, sleeper);
 
         adapter.embed(List.of("a", "b", "c"));
 

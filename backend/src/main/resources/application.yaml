@@ -30,6 +30,7 @@ spring:
     openai:
       api-key: ${SPRING_AI_OPENAI_API_KEY:${OPENAI_API_KEY:}}
       chat: { options: { model: gpt-4o-mini } }
+      embedding: { options: { model: text-embedding-3-small } }
     google:
       genai:
         api-key: ${SPRING_AI_GOOGLE_GENAI_API_KEY:${GEMINI_API_KEY:}}
@@ -55,6 +56,11 @@ spring:
       auto-offset-reset: earliest
 
 workdone:
+  ai:
+    embedding:
+      provider-order: [ "cohere", "openai", "local" ]
+      cohere:
+        model: embed-multilingual-v3.0
   profile:
     input-directory: /data/workdone/profile-input
   matching:

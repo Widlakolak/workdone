@@ -10,5 +10,6 @@ public enum OfferStatus {
     APPLIED,
     REJECTED,
     GHOST_JOB,
+    SENT,
     ARCHIVED
 }
