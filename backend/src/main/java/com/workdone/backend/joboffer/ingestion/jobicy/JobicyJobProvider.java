@@ -1,6 +1,7 @@
 package com.workdone.backend.joboffer.ingestion.jobicy;
 
 import com.workdone.backend.joboffer.analysis.LocationGuard;
+import com.workdone.backend.common.util.ProviderCallExecutor;
 import com.workdone.backend.joboffer.ingestion.JobProvider;
 import com.workdone.backend.joboffer.ingestion.SearchContext;
 import com.workdone.backend.common.model.JobOfferRecord;
@@ -20,22 +21,25 @@ import java.util.List;
 public class JobicyJobProvider implements JobProvider {
 
     private static final String SOURCE_NAME = "JOBICY";
-    
+
     private final RestClient restClient;
     private final JobicyProperties properties;
     private final JobicyMapper mapper;
     private final LocationGuard locationGuard;
+    private final ProviderCallExecutor callExecutor;
 
     public JobicyJobProvider(@Qualifier("workDoneRestClientBuilder") RestClient.Builder restClientBuilder,
                              JobicyProperties properties,
                              JobicyMapper mapper,
-                             LocationGuard locationGuard) {
+                             LocationGuard locationGuard,
+                             ProviderCallExecutor callExecutor) {
         this.restClient = restClientBuilder
                 .baseUrl(properties.baseUrl())
                 .build();
         this.properties = properties;
         this.mapper = mapper;
         this.locationGuard = locationGuard;
+        this.callExecutor = callExecutor;
     }
 
     @Override
@@ -48,13 +52,13 @@ public class JobicyJobProvider implements JobProvider {
         log.info("🚀 [JOBICY] Pobieram paczkę ofert dla lokalizacji: {}", context.location());
 
         try {
-            JobicyResponse response = restClient.get()
+            JobicyResponse response = callExecutor.execute(SOURCE_NAME, () -> restClient.get()
                     .uri(uriBuilder -> uriBuilder
                             .queryParam("count", 50)
                             .queryParam("geo", "europe")
                             .build())
                     .retrieve()
-                    .body(JobicyResponse.class);
+                    .body(JobicyResponse.class));
 
             if (response == null || response.getJobs() == null) return List.of();
 

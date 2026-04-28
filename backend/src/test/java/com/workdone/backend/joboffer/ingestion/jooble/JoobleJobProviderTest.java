@@ -1,6 +1,7 @@
 package com.workdone.backend.joboffer.ingestion.jooble;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.workdone.backend.common.util.ProviderCallExecutor;
 import com.workdone.backend.joboffer.analysis.DynamicConfigService;
 import com.workdone.backend.joboffer.analysis.LocationGuard;
 import com.workdone.backend.joboffer.analysis.TechStackExtractor;
@@ -35,6 +36,7 @@ class JoobleJobProviderTest {
     private final DynamicConfigService dynamicConfigService = Mockito.mock(DynamicConfigService.class);
     private final LocationGuard locationGuard = new LocationGuard(dynamicConfigService);
     private final TechStackExtractor techStackExtractor = new TechStackExtractor(); // Prawdziwy ekstraktor, bo jest bezstanowy
+    private final ProviderCallExecutor callExecutor = Mockito.mock(ProviderCallExecutor.class);
 
     @BeforeEach
     void setUp() {
@@ -49,7 +51,7 @@ class JoobleJobProviderTest {
         RestClient.Builder restClientBuilder = RestClient.builder();
         mockServer = MockRestServiceServer.bindTo(restClientBuilder).build();
 
-        joobleProvider = new JoobleJobProvider(restClientBuilder, properties, joobleMapper, locationGuard);
+        joobleProvider = new JoobleJobProvider(restClientBuilder, properties, joobleMapper, locationGuard, callExecutor);
     }
 
     @Test
@@ -57,7 +59,7 @@ class JoobleJobProviderTest {
         JoobleProperties.Filters filters = new JoobleProperties.Filters(List.of("java"), "Lodz", true);
         JoobleProperties broken = new JoobleProperties(true, "dummy-key-123", null, null, filters);
 
-        JoobleJobProvider provider = new JoobleJobProvider(RestClient.builder(), broken, joobleMapper, locationGuard);
+        JoobleJobProvider provider = new JoobleJobProvider(RestClient.builder(), broken, joobleMapper, locationGuard, callExecutor);
 
         assertThatThrownBy(provider::validateConfiguration)
                 .isInstanceOf(IllegalStateException.class)
@@ -84,6 +86,12 @@ class JoobleJobProviderTest {
         mockServer.expect(requestTo("https://jooble.org/api/dummy-key-123"))
                 .andExpect(method(HttpMethod.POST))
                 .andRespond(withSuccess(objectMapper.writeValueAsString(mockResponse), MediaType.APPLICATION_JSON));
+
+        when(callExecutor.execute(Mockito.eq("JOOBLE"), Mockito.any())).thenAnswer(invocation -> {
+            @SuppressWarnings("unchecked")
+            java.util.concurrent.Callable<JoobleResponse> callable = invocation.getArgument(1);
+            return callable.call();
+        });
 
         // When
         List<JobOfferRecord> offers = joobleProvider.fetchOffers(context);

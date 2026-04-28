@@ -87,7 +87,7 @@ public class JobSearchParametersProvider {
             log.info("🌐 Dodaję globalny kontekst wyszukiwania zdalnego, ponieważ allowRemoteSearch jest true i brak dedykowanej polityki.");
             searchContexts.add(SearchContext.builder()
                     .keywords(finalKeywords)
-                    .location(null) // null oznacza globalne wyszukiwanie zdalne
+                    .location(SearchContext.REMOTE_GLOBAL)
                     .remoteOnly(true)
                     .maxResults(maxResults)
                     .build());

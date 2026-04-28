@@ -1,6 +1,7 @@
 package com.workdone.backend.joboffer.ingestion.jooble;
 
 import com.workdone.backend.joboffer.analysis.LocationGuard;
+import com.workdone.backend.common.util.ProviderCallExecutor;
 import com.workdone.backend.joboffer.ingestion.JobProvider;
 import com.workdone.backend.joboffer.ingestion.SearchContext;
 import com.workdone.backend.common.model.JobOfferRecord;
@@ -29,11 +30,13 @@ public class JoobleJobProvider implements JobProvider {
     private final JoobleProperties properties;
     private final JoobleMapper mapper;
     private final LocationGuard locationGuard;
+    private final ProviderCallExecutor callExecutor;
 
     public JoobleJobProvider(@Qualifier("workDoneRestClientBuilder") RestClient.Builder restClientBuilder,
                              JoobleProperties properties,
                              JoobleMapper mapper,
-                             LocationGuard locationGuard) {
+                             LocationGuard locationGuard,
+                             ProviderCallExecutor callExecutor) {
         String baseUrl = properties.resolvedUrl();
         this.restClient = restClientBuilder
                 .baseUrl(baseUrl != null ? baseUrl : "")
@@ -41,6 +44,7 @@ public class JoobleJobProvider implements JobProvider {
         this.properties = properties;
         this.mapper = mapper;
         this.locationGuard = locationGuard;
+        this.callExecutor = callExecutor;
     }
 
     @PostConstruct
@@ -75,17 +79,18 @@ public class JoobleJobProvider implements JobProvider {
         }
 
         String fullUrl = baseUrl.endsWith("/") ? baseUrl + apiKey : baseUrl + "/" + apiKey;
+        String location = normalizeLocation(context.location());
 
         try {
-            JoobleResponse response = restClient.post()
+            JoobleResponse response = callExecutor.execute(SOURCE_NAME, () -> restClient.post()
                     .uri(java.net.URI.create(fullUrl))
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(Map.of(
                             "keywords", String.join(" ", context.keywords()),
-                            "location", context.location() != null ? context.location() : ""
+                            "location", location
                     ))
                     .retrieve()
-                    .body(JoobleResponse.class);
+                    .body(JoobleResponse.class));
 
             if (response == null || response.jobs() == null || response.jobs().isEmpty()) {
                 return Collections.emptyList();
@@ -100,5 +105,12 @@ public class JoobleJobProvider implements JobProvider {
             log.error("❌ Jooble Fetch Error: {}", e.getMessage());
             return Collections.emptyList();
         }
+    }
+
+    private String normalizeLocation(String location) {
+        if (location == null || SearchContext.REMOTE_GLOBAL.equalsIgnoreCase(location)) {
+            return "";
+        }
+        return location;
     }
 }

@@ -43,4 +43,36 @@ class OfferMatchingServiceTest {
 
         assertThat(service.passesMustHave(offer)).isTrue();
     }
+
+    @Test
+    void shouldPassCoreMustHaveWhenRequiredGroupsMatch() {
+        MustHaveGroupConfig groupConfig = Mockito.mock(MustHaveGroupConfig.class);
+        DynamicConfigService dynamicConfig = Mockito.mock(DynamicConfigService.class);
+        Mockito.when(groupConfig.groups()).thenReturn(List.of(
+                new MustHaveGroup("language", List.of("java"), true),
+                new MustHaveGroup("framework", List.of("spring boot"), true),
+                new MustHaveGroup("database", List.of("sql"), false)
+        ));
+        Mockito.when(dynamicConfig.getMustHaveKeywords()).thenReturn(List.of());
+
+        OfferMatchingService service = new OfferMatchingService(groupConfig, dynamicConfig);
+        JobOfferRecord offer = JobOfferRecord.builder()
+                .id("2")
+                .fingerprint("fp2")
+                .title("Java Backend Engineer")
+                .companyName("ACME")
+                .sourceUrl("https://example.com/job/2")
+                .location("Remote")
+                .rawDescription("Projekt w Spring Boot dla backendu")
+                .salaryRange("n/a")
+                .techStack(List.of("Java", "Spring Boot"))
+                .matchingScore(0.0)
+                .priorityScore(0.0)
+                .status(OfferStatus.NEW)
+                .publishedAt(LocalDateTime.now())
+                .sourcePlatform("TEST")
+                .build();
+
+        assertThat(service.passesCoreMustHave(offer)).isTrue();
+    }
 }

@@ -24,15 +24,29 @@ public class OfferProcessor {
     private final OfferPriorityService priorityService;
     private final OfferAnalysisFacade aiAnalysisFacade;
     private final OfferMatchingService matchingService;
+    private final DynamicConfigService dynamicConfig;
 
     public ProcessingResult preProcess(JobOfferRecord offer, float[] candidateVector, float[] offerVector) {
-        if (!matchingService.passesMustHave(offer)) {
-            return ProcessingResult.skipped();
-        }
-
         double semanticScore = 0;
         if (candidateVector != null && offerVector != null) {
             semanticScore = vectorStore.calculateCosineSimilarity(candidateVector, offerVector) * 100;
+        }
+
+        boolean strictMustHave = matchingService.passesMustHave(offer);
+        boolean coreMustHave = matchingService.passesCoreMustHave(offer);
+        double semanticThreshold = dynamicConfig.getSemanticThreshold();
+
+        // Staged filtering:
+        // 1) jeśli spełnia pełne must-have -> przechodzi
+        // 2) jeśli nie spełnia pełnego must-have, ale spełnia core (language + framework) -> przechodzi
+        // 3) jeśli nie spełnia core, przepuszczamy tylko gdy semantyka jest >= configured threshold (AI rescue lane)
+        if (!strictMustHave && !coreMustHave && semanticScore < semanticThreshold) {
+            return ProcessingResult.skipped();
+        }
+
+        // Kara za "rescue lane", żeby pełne dopasowania miały priorytet
+        if (!strictMustHave) {
+            semanticScore *= 0.90;
         }
 
         JobOfferRecord enriched = offer.toBuilder()

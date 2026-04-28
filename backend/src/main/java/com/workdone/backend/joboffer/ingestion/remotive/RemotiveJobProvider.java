@@ -1,6 +1,7 @@
 package com.workdone.backend.joboffer.ingestion.remotive;
 
 import com.workdone.backend.joboffer.analysis.LocationGuard;
+import com.workdone.backend.common.util.ProviderCallExecutor;
 import com.workdone.backend.joboffer.ingestion.JobProvider;
 import com.workdone.backend.joboffer.ingestion.SearchContext;
 import com.workdone.backend.common.model.JobOfferRecord;
@@ -28,17 +29,20 @@ public class RemotiveJobProvider implements JobProvider {
     private final RemotiveProperties properties;
     private final RemotiveMapper mapper;
     private final LocationGuard locationGuard;
+    private final ProviderCallExecutor callExecutor;
 
     public RemotiveJobProvider(@Qualifier("workDoneRestClientBuilder") RestClient.Builder restClientBuilder,
                                RemotiveProperties properties,
                                RemotiveMapper mapper,
-                               LocationGuard locationGuard) {
+                               LocationGuard locationGuard,
+                               ProviderCallExecutor callExecutor) {
         this.restClient = restClientBuilder
                 .baseUrl(properties.baseUrl())
                 .build();
         this.properties = properties;
         this.mapper = mapper;
         this.locationGuard = locationGuard;
+        this.callExecutor = callExecutor;
     }
 
     @Override
@@ -60,10 +64,10 @@ public class RemotiveJobProvider implements JobProvider {
                     .queryParam("category", "software-dev")
                     .toUriString();
 
-            RemotiveResponse response = restClient.get()
+            RemotiveResponse response = callExecutor.execute(SOURCE_NAME, () -> restClient.get()
                     .uri(uri)
                     .retrieve()
-                    .body(RemotiveResponse.class);
+                    .body(RemotiveResponse.class));
 
             if (response == null || response.getJobs() == null) {
                 return Collections.emptyList();

@@ -17,8 +17,7 @@ public class OfferMatchingService {
     private final DynamicConfigService dynamicConfig;
 
     public boolean passesMustHave(JobOfferRecord offer) {
-        String context = normalize((offer.title() + " " + offer.rawDescription() + " " + offer.techStack())
-                .toLowerCase(Locale.ROOT));
+        String context = buildContext(offer);
 
         // Najpierw sprawdzam moje własne słowa kluczowe (te, które ręcznie wrzuciłem przez bota na Discordzie)
         List<String> dynamicMustHave = dynamicConfig.getMustHaveKeywords();
@@ -54,8 +53,20 @@ public class OfferMatchingService {
         if (!passed) {
             log.debug("❌ Oferta {} odrzucona: dopasowano {}/{} grup", offer.title(), matchedGroups, minRequired);
         }
-        
+
         return passed;
+    }
+
+    public boolean passesCoreMustHave(JobOfferRecord offer) {
+        String context = buildContext(offer);
+        return groupConfig.groups().stream()
+                .filter(MustHaveGroup::required)
+                .allMatch(group -> containsAny(context, group.keywords()));
+    }
+
+    private String buildContext(JobOfferRecord offer) {
+        return normalize((offer.title() + " " + offer.rawDescription() + " " + offer.techStack())
+                .toLowerCase(Locale.ROOT));
     }
 
     private boolean containsAny(String text, List<String> keywords) {

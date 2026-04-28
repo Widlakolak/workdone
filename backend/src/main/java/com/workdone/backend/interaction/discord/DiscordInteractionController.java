@@ -24,13 +24,16 @@ public class DiscordInteractionController {
     private static final int MESSAGE_COMPONENT = 3;
 
     private final DiscordInteractionService interactionService;
+    private final DiscordInteractionDedupService dedupService;
     private final byte[] decodedPublicKey;
     private final ObjectMapper objectMapper;
 
     public DiscordInteractionController(DiscordInteractionService interactionService,
+                                        DiscordInteractionDedupService dedupService,
                                         @Value("${workdone.discord.public-key:}") String publicKey,
                                         ObjectMapper objectMapper) {
         this.interactionService = interactionService;
+        this.dedupService = dedupService;
         this.objectMapper = objectMapper;
         this.decodedPublicKey = (publicKey != null && !publicKey.isBlank()) ? Hex.decode(publicKey) : null;
     }
@@ -54,6 +57,13 @@ public class DiscordInteractionController {
             }
 
             if (request.type() == MESSAGE_COMPONENT && request.data() != null) {
+                if (!dedupService.markIfNew(request.id())) {
+                    log.info("♻️ Zduplikowana interakcja Discord pominięta: {}", request.id());
+                    return ResponseEntity.ok(Map.of(
+                            "type", 4,
+                            "data", Map.of("content", "✅ Akcja już została przetworzona.", "flags", 64)
+                    ));
+                }
                 String resultMessage = interactionService.handleCustomId(request.data().customId());
                 return ResponseEntity.ok(Map.of(
                         "type", 4,
@@ -94,7 +104,7 @@ public class DiscordInteractionController {
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record DiscordInteractionRequest(int type, DiscordInteractionData data) {}
+    public record DiscordInteractionRequest(String id, int type, DiscordInteractionData data) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record DiscordInteractionData(@JsonProperty("custom_id") String customId) {}

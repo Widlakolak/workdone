@@ -40,10 +40,12 @@ class OfferIngestionOrchestratorFallbackTest {
     private DynamicConfigService dynamicConfigService;
     private AiExecutionPolicy aiPolicy;
     private OfferIngestionOrchestrator orchestrator;
+    private OfferDeduplicationService offerDeduplicationService;
 
     @BeforeEach
     void setUp() {
         provider = mock(JobProvider.class);
+        when(provider.scope()).thenReturn(JobProvider.Scope.CONTEXTUAL);
         offerEnricher = mock(OfferEnricher.class);
         store = mock(OfferStore.class);
         offerProcessor = mock(OfferProcessor.class);
@@ -55,6 +57,7 @@ class OfferIngestionOrchestratorFallbackTest {
         searchParametersProvider = mock(JobSearchParametersProvider.class);
         dynamicConfigService = mock(DynamicConfigService.class);
         aiPolicy = mock(AiExecutionPolicy.class);
+        offerDeduplicationService = mock(OfferDeduplicationService.class);
 
         orchestrator = new OfferIngestionOrchestrator(
                 List.of(provider),
@@ -67,7 +70,8 @@ class OfferIngestionOrchestratorFallbackTest {
                 searchParametersProvider,
                 dynamicConfigService,
                 aiPolicy,
-                classificationService
+                classificationService,
+                offerDeduplicationService
         );
     }
 
@@ -88,6 +92,7 @@ class OfferIngestionOrchestratorFallbackTest {
         when(offerEnricher.cleanAndEnrich(rawOffer)).thenReturn(rawOffer);
         when(store.existsBySourceOrFingerprint(rawOffer)).thenReturn(false);
         when(embeddingService.embedOffers(any())).thenReturn(List.of(new float[]{0.1f}));
+        when(offerDeduplicationService.isDuplicate(any())).thenReturn(false);
 
         // Mockujemy nową logikę OfferProcessor
         when(offerProcessor.preProcess(eq(rawOffer), any(), any()))
@@ -114,6 +119,7 @@ class OfferIngestionOrchestratorFallbackTest {
         when(offerEnricher.cleanAndEnrich(rawOffer)).thenReturn(rawOffer);
         when(store.existsBySourceOrFingerprint(rawOffer)).thenReturn(false);
         when(embeddingService.embedOffers(any())).thenReturn(List.of(new float[]{0.1f}));
+        when(offerDeduplicationService.isDuplicate(any())).thenReturn(false);
 
         // Mockujemy pominięcie w fazie 1
         when(offerProcessor.preProcess(any(), any(), any())).thenReturn(OfferProcessor.ProcessingResult.skipped());

@@ -10,7 +10,24 @@ import java.util.List;
  */
 public interface JobProvider {
 
+    enum Scope {
+        GLOBAL,
+        CONTEXTUAL
+    }
+
     String sourceName();
 
     List<JobOfferRecord> fetchOffers(SearchContext context);
+
+    default Scope scope() {
+        return Scope.CONTEXTUAL;
+    }
+
+    default String requestKey(SearchContext context) {
+        String location = (context.location() == null || context.isGlobalRemote())
+                ? SearchContext.REMOTE_GLOBAL
+                : context.location().trim().toLowerCase();
+        String keywords = context.keywords() == null ? "" : String.join(",", context.keywords());
+        return sourceName() + "|" + context.remoteOnly() + "|" + location + "|" + keywords;
+    }
 }

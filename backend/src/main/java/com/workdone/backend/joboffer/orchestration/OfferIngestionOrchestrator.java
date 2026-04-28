@@ -17,7 +17,11 @@ import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 @Slf4j
@@ -36,6 +40,7 @@ public class OfferIngestionOrchestrator {
     private final DynamicConfigService dynamicConfigService;
     private final AiExecutionPolicy aiPolicy;
     private final OfferClassificationService classificationService;
+    private final OfferDeduplicationService offerDeduplicationService;
 
     private final AtomicBoolean isIngestionRunning = new AtomicBoolean(false);
 
@@ -51,26 +56,31 @@ public class OfferIngestionOrchestrator {
             float[] candidateVector = candidateProfileService.getCandidateVector();
             List<SearchContext> contexts = searchParametersProvider.getContexts();
             List<JobOfferRecord> allNewOffers = new ArrayList<>();
+            Map<String, List<JobOfferRecord>> fetchCache = new HashMap<>();
+            Set<String> seenInRun = new HashSet<>();
 
             // KROK 1: Ingestia i Deduplikacja wstępna
-            for (SearchContext context : contexts) {
-                for (JobProvider provider : providers) {
-                    try {
-                        List<JobOfferRecord> raw = provider.fetchOffers(context);
-                        metrics.totalFetched += raw.size();
+            List<JobProvider> globalProviders = providers.stream()
+                    .filter(p -> p.scope() == JobProvider.Scope.GLOBAL)
+                    .toList();
+            List<JobProvider> contextualProviders = providers.stream()
+                    .filter(p -> p.scope() == JobProvider.Scope.CONTEXTUAL)
+                    .toList();
 
-                        List<JobOfferRecord> unique = raw.stream()
-                                .map(offerEnricher::cleanAndEnrich)
-                                .filter(offer -> {
-                                    boolean exists = store.existsBySourceOrFingerprint(offer);
-                                    if (exists) metrics.alreadyExists++;
-                                    return !exists;
-                                })
-                                .toList();
-                        allNewOffers.addAll(unique);
-                    } catch (Exception e) {
-                        log.error("❌ Provider {} error: {}", provider.sourceName(), e.getMessage());
-                    }
+            SearchContext fallbackContext = contexts.isEmpty() ? SearchContext.builder()
+                    .keywords(List.of("java"))
+                    .location(SearchContext.REMOTE_GLOBAL)
+                    .remoteOnly(true)
+                    .maxResults(100)
+                    .build() : contexts.getFirst();
+
+            for (JobProvider provider : globalProviders) {
+                fetchAndCollect(provider, fallbackContext, fetchCache, seenInRun, allNewOffers, metrics);
+            }
+
+            for (SearchContext context : contexts) {
+                for (JobProvider provider : contextualProviders) {
+                    fetchAndCollect(provider, context, fetchCache, seenInRun, allNewOffers, metrics);
                 }
             }
 
@@ -86,6 +96,10 @@ public class OfferIngestionOrchestrator {
             for (int i = 0; i < allNewOffers.size(); i++) {
                 JobOfferRecord offer = allNewOffers.get(i);
                 float[] vector = (vectors.size() > i) ? vectors.get(i) : null;
+                if (offerDeduplicationService.isDuplicate(vector)) {
+                    metrics.alreadyExists++;
+                    continue;
+                }
 
                 var result = offerProcessor.preProcess(offer, candidateVector, vector);
                 if (result.processed()) {
@@ -171,5 +185,52 @@ public class OfferIngestionOrchestrator {
         notifier.sendInstant(bestOfferThisRun);
         log.info("🏆 Wysłano najlepszą ofertę jako fallback po skanie: {} ({})",
                 bestOfferThisRun.title(), String.format("%.1f", bestOfferThisRun.priorityScore()));
+    }
+
+    private void fetchAndCollect(JobProvider provider,
+                                 SearchContext context,
+                                 Map<String, List<JobOfferRecord>> fetchCache,
+                                 Set<String> seenInRun,
+                                 List<JobOfferRecord> allNewOffers,
+                                 IngestionMetrics metrics) {
+        String requestKey = provider.requestKey(context);
+        List<JobOfferRecord> raw;
+        if (fetchCache.containsKey(requestKey)) {
+            raw = fetchCache.get(requestKey);
+            log.debug("♻️ [CACHE HIT] {} -> {}", provider.sourceName(), requestKey);
+        } else {
+            try {
+                raw = provider.fetchOffers(context);
+                fetchCache.put(requestKey, raw);
+            } catch (Exception e) {
+                log.error("❌ Provider {} error: {}", provider.sourceName(), e.getMessage());
+                return;
+            }
+        }
+
+        metrics.totalFetched += raw.size();
+
+        List<JobOfferRecord> unique = raw.stream()
+                .map(offerEnricher::cleanAndEnrich)
+                .filter(offer -> {
+                    boolean seen = seenInRun.contains(offer.sourceUrl()) || seenInRun.contains(offer.fingerprint());
+                    if (seen) {
+                        metrics.alreadyExists++;
+                        return false;
+                    }
+
+                    boolean exists = store.existsBySourceOrFingerprint(offer);
+                    if (exists) {
+                        metrics.alreadyExists++;
+                        return false;
+                    }
+
+                    seenInRun.add(offer.sourceUrl());
+                    seenInRun.add(offer.fingerprint());
+                    return true;
+                })
+                .toList();
+
+        allNewOffers.addAll(unique);
     }
 }

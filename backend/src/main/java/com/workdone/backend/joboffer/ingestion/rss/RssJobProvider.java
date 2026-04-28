@@ -46,6 +46,16 @@ public class RssJobProvider implements JobProvider {
     }
 
     @Override
+    public Scope scope() {
+        return Scope.GLOBAL;
+    }
+
+    @Override
+    public String requestKey(SearchContext context) {
+        return sourceName() + "|GLOBAL";
+    }
+
+    @Override
     public List<JobOfferRecord> fetchOffers(SearchContext context) {
         List<JobOfferRecord> allOffers = new ArrayList<>();
 
