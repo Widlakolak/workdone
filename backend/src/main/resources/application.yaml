@@ -100,7 +100,7 @@ workdone:
       enabled: true
       priority: HIGH
       api-key: ${JOOBLE_API_KEY}
-      base-url: https://jooble.org/api
+      url: https://jooble.org/api
       filters:
         keywords: "java, spring boot, sql"
         location: "Europe"

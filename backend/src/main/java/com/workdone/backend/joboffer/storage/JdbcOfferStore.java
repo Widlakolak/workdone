@@ -7,12 +7,14 @@ import com.workdone.backend.common.model.JobOfferRecord;
 import com.workdone.backend.common.model.OfferStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.postgresql.util.PGobject;
 import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -49,10 +51,12 @@ public class JdbcOfferStore implements OfferStore {
             log.error("Błąd serializacji metadanych dla oferty {}: {}", offer.id(), e.getMessage());
         }
 
+        final String finalMetadataJson = metadataJson;
+
         String sql = """
             INSERT INTO job_offers (id, fingerprint, title, company, location, matching_score, priority_score, status,
                                     source_url, raw_description, tech_stack, published_at, metadata, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?::jsonb, NOW(), NOW())
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
             ON CONFLICT (fingerprint) DO UPDATE SET
                 title = EXCLUDED.title,
                 company = EXCLUDED.company,
@@ -69,21 +73,23 @@ public class JdbcOfferStore implements OfferStore {
             WHERE job_offers.priority_score < EXCLUDED.priority_score OR job_offers.status != EXCLUDED.status
             """;
 
-        jdbcTemplate.update(sql,
-                offer.id() != null ? UUID.fromString(offer.id()) : UUID.randomUUID(), // Użyj istniejącego ID lub wygeneruj nowe
-                offer.fingerprint(),
-                offer.title(),
-                offer.companyName(),
-                offer.location(),
-                offer.matchingScore(),
-                offer.priorityScore(),
-                offer.status().name(),
-                offer.sourceUrl(),
-                offer.rawDescription(),
-                offer.techStack() != null ? toJsonb(offer.techStack()) : "[]", // Konwersja List<String> na JSONB
-                offer.publishedAt() != null ? offer.publishedAt() : LocalDateTime.now(),
-                metadataJson
-        );
+        jdbcTemplate.update(connection -> {
+            var ps = connection.prepareStatement(sql);
+            ps.setObject(1, offer.id() != null ? UUID.fromString(offer.id()) : UUID.randomUUID());
+            ps.setString(2, offer.fingerprint());
+            ps.setString(3, offer.title());
+            ps.setString(4, offer.companyName());
+            ps.setString(5, offer.location());
+            ps.setDouble(6, offer.matchingScore());
+            ps.setDouble(7, offer.priorityScore());
+            ps.setString(8, offer.status().name());
+            ps.setString(9, offer.sourceUrl());
+            ps.setString(10, offer.rawDescription());
+            ps.setObject(11, toJsonbObject(offer.techStack() != null ? toJsonb(offer.techStack()) : "[]"));
+            ps.setTimestamp(12, Timestamp.valueOf(offer.publishedAt() != null ? offer.publishedAt() : LocalDateTime.now()));
+            ps.setObject(13, toJsonbObject(finalMetadataJson));
+            return ps;
+        });
     }
 
     @Override
@@ -139,6 +145,17 @@ public class JdbcOfferStore implements OfferStore {
             log.error("Błąd konwersji List<String> na JSONB: {}", e.getMessage());
             return "[]";
         }
+    }
+
+    private PGobject toJsonbObject(String json) {
+        PGobject jsonObject = new PGobject();
+        jsonObject.setType("jsonb");
+        try {
+            jsonObject.setValue(json);
+        } catch (SQLException e) {
+            throw new IllegalStateException("Nie udało się zmapować wartości JSONB", e);
+        }
+        return jsonObject;
     }
 
     // Helper do konwersji JSONB string na List<String>

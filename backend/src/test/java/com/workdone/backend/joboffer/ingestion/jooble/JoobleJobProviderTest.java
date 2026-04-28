@@ -20,6 +20,7 @@ import org.springframework.web.client.RestClient;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
@@ -41,7 +42,7 @@ class JoobleJobProviderTest {
         ReflectionTestUtils.setField(joobleMapper, "techStackExtractor", techStackExtractor);
 
         JoobleProperties.Filters filters = new JoobleProperties.Filters(List.of("java"), "Lodz", true);
-        JoobleProperties properties = new JoobleProperties(true, "dummy-key-123", "https://jooble.org/api/", filters);
+        JoobleProperties properties = new JoobleProperties(true, "dummy-key-123", "https://jooble.org/api/", null, filters);
         
         when(dynamicConfigService.getLocationPolicies()).thenReturn(List.of(new LocationPolicy("Lodz", true, true, true, 5)));
 
@@ -49,6 +50,18 @@ class JoobleJobProviderTest {
         mockServer = MockRestServiceServer.bindTo(restClientBuilder).build();
 
         joobleProvider = new JoobleJobProvider(restClientBuilder, properties, joobleMapper, locationGuard);
+    }
+
+    @Test
+    void shouldFailFastWhenEnabledAndUrlMissing() {
+        JoobleProperties.Filters filters = new JoobleProperties.Filters(List.of("java"), "Lodz", true);
+        JoobleProperties broken = new JoobleProperties(true, "dummy-key-123", null, null, filters);
+
+        JoobleJobProvider provider = new JoobleJobProvider(RestClient.builder(), broken, joobleMapper, locationGuard);
+
+        assertThatThrownBy(provider::validateConfiguration)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("URL is missing");
     }
 
     @Test

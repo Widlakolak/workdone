@@ -9,8 +9,19 @@ public record JoobleProperties(
         boolean enabled,
         String apiKey,
         String url,
+        String baseUrl,
         Filters filters
 ) {
+
+    public String resolvedUrl() {
+        if (url != null && !url.isBlank()) {
+            return url;
+        }
+        if (baseUrl != null && !baseUrl.isBlank()) {
+            return baseUrl;
+        }
+        return null;
+    }
 
     public record Filters(
             List<String> keywords,

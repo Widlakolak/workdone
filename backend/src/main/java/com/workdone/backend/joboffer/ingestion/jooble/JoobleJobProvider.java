@@ -12,6 +12,7 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
+import jakarta.annotation.PostConstruct;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -33,12 +34,26 @@ public class JoobleJobProvider implements JobProvider {
                              JoobleProperties properties,
                              JoobleMapper mapper,
                              LocationGuard locationGuard) {
+        String baseUrl = properties.resolvedUrl();
         this.restClient = restClientBuilder
-                .baseUrl(properties.url())
+                .baseUrl(baseUrl != null ? baseUrl : "")
                 .build();
         this.properties = properties;
         this.mapper = mapper;
         this.locationGuard = locationGuard;
+    }
+
+    @PostConstruct
+    void validateConfiguration() {
+        if (!properties.enabled()) {
+            return;
+        }
+        if (properties.resolvedUrl() == null) {
+            throw new IllegalStateException("Jooble provider is enabled, but URL is missing. Configure workdone.providers.jooble.url or workdone.providers.jooble.base-url");
+        }
+        if (properties.apiKey() == null || properties.apiKey().isBlank()) {
+            throw new IllegalStateException("Jooble provider is enabled, but API key is missing. Configure workdone.providers.jooble.api-key");
+        }
     }
 
     @Override
@@ -49,7 +64,17 @@ public class JoobleJobProvider implements JobProvider {
     @Override
     public List<JobOfferRecord> fetchOffers(SearchContext context) {
         String apiKey = properties.apiKey();
-        String fullUrl = properties.url().endsWith("/") ? properties.url() + apiKey : properties.url() + "/" + apiKey;
+        String baseUrl = properties.resolvedUrl();
+        if (baseUrl == null || baseUrl.isBlank()) {
+            log.error("❌ Jooble fetch skipped: provider URL is missing (workdone.providers.jooble.url / base-url)");
+            return Collections.emptyList();
+        }
+        if (apiKey == null || apiKey.isBlank()) {
+            log.error("❌ Jooble fetch skipped: API key is missing (workdone.providers.jooble.api-key)");
+            return Collections.emptyList();
+        }
+
+        String fullUrl = baseUrl.endsWith("/") ? baseUrl + apiKey : baseUrl + "/" + apiKey;
 
         try {
             JoobleResponse response = restClient.post()
