@@ -1,11 +1,10 @@
 package com.workdone.backend.profile.service;
 
-import com.workdone.backend.analysis.DynamicConfigService;
-import com.workdone.backend.analysis.OfferEmbeddingService;
+import com.workdone.backend.joboffer.analysis.DynamicConfigService;
+import com.workdone.backend.joboffer.analysis.OfferEmbeddingService;
 import com.workdone.backend.profile.parser.CvSemanticParser;
 import jakarta.annotation.PostConstruct;
 import lombok.Getter;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.core.env.Environment;

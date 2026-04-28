@@ -103,8 +103,8 @@ workdone:
       base-url: https://jooble.org/api
       filters:
         keywords: "java, spring boot, sql"
-        location: "Łódź"
-        radius: "50"
+        location: "Europe"
+#        radius: "50"
         allow-remote: true
     jobicy:
       enabled: true
@@ -112,6 +112,10 @@ workdone:
       base-url: "https://jobicy.com/api/v2/remote-jobs"
       filters:
         count: 50
-        geo: ""
+        geo: "Europe"
         industry: "engineering" 
         tag: "java, spring boot"
+
+logging:
+  level:
+    com.workdone.backend.ingestion: DEBUG

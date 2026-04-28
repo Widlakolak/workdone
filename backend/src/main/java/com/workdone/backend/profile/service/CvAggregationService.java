@@ -1,6 +1,6 @@
 package com.workdone.backend.profile.service;
 
-import com.workdone.backend.config.WorkDoneProperties;
+import com.workdone.backend.common.config.WorkDoneProperties;
 import com.workdone.backend.profile.parser.CvDocumentParser;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

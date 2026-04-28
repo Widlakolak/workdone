@@ -26,3 +26,7 @@ workdone:
     ingestion-cron: "0 0 * * * *"
     digest-cron: "0 0 9 * * *"
     zone-id: "Europe/Warsaw"
+
+logging:
+  level:
+    com.workdone.backend.ingestion: DEBUG

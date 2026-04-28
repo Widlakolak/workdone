@@ -1,7 +1,7 @@
 package com.workdone.backend;
 
-import com.workdone.backend.ingestion.rss.RssProperties;
-import com.workdone.backend.notification.DiscordNotifier;
+import com.workdone.backend.joboffer.ingestion.rss.RssProperties;
+import com.workdone.backend.joboffer.notification.DiscordNotifier;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;

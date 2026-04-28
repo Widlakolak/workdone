@@ -1,12 +1,12 @@
 package com.workdone.backend.interaction.discord;
 
-import com.workdone.backend.orchestration.OfferIngestionOrchestrator;
+import com.workdone.backend.joboffer.orchestration.OfferIngestionOrchestrator;
 import com.workdone.backend.profile.service.CandidateProfileService;
-import com.workdone.backend.analysis.DynamicConfigService;
-import com.workdone.backend.model.JobOfferRecord;
-import com.workdone.backend.model.OfferStatus;
-import com.workdone.backend.notification.DiscordNotifier;
-import com.workdone.backend.storage.InMemoryOfferStore;
+import com.workdone.backend.joboffer.analysis.DynamicConfigService;
+import com.workdone.backend.common.model.JobOfferRecord;
+import com.workdone.backend.common.model.OfferStatus;
+import com.workdone.backend.joboffer.notification.DiscordNotifier;
+import com.workdone.backend.joboffer.storage.InMemoryOfferStore;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 

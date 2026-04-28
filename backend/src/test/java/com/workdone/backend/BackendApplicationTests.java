@@ -1,12 +1,13 @@
 package com.workdone.backend;
 
-import com.workdone.backend.analysis.*;
-import com.workdone.backend.orchestration.OfferIngestionOrchestrator;
+import com.workdone.backend.joboffer.analysis.OfferEmbeddingService;
+import com.workdone.backend.joboffer.analysis.OfferScoringService;
+import com.workdone.backend.joboffer.orchestration.OfferIngestionOrchestrator;
 import com.workdone.backend.profile.parser.CvSemanticParser;
 import com.workdone.backend.profile.service.CandidateProfileService;
 import com.workdone.backend.profile.service.CvAggregationService;
-import com.workdone.backend.analysis.DynamicConfigService;
-import com.workdone.backend.storage.OfferVectorStore;
+import com.workdone.backend.joboffer.analysis.DynamicConfigService;
+import com.workdone.backend.joboffer.storage.OfferVectorStore;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;

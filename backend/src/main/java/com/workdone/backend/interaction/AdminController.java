@@ -1,8 +1,8 @@
 package com.workdone.backend.interaction;
 
 import com.workdone.backend.profile.service.CandidateProfileService;
-import com.workdone.backend.notification.DiscordNotifier;
-import com.workdone.backend.orchestration.OfferIngestionOrchestrator;
+import com.workdone.backend.joboffer.notification.DiscordNotifier;
+import com.workdone.backend.joboffer.orchestration.OfferIngestionOrchestrator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.PostMapping;

@@ -1,7 +1,7 @@
 package com.workdone.backend.profile.service;
 
-import com.workdone.backend.analysis.DynamicConfigService;
-import com.workdone.backend.analysis.OfferEmbeddingService;
+import com.workdone.backend.joboffer.analysis.DynamicConfigService;
+import com.workdone.backend.joboffer.analysis.OfferEmbeddingService;
 import com.workdone.backend.profile.parser.CvSemanticParser;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
